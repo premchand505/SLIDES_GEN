@@ -1,37 +1,35 @@
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils"; // <-- Tests the @/lib alias
+import { ChatInterface } from '@/components/ChatInterface'; // <-- Import
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">
-          AI PPT Generator
-        </h1>
-        <p className="text-lg text-muted-foreground mt-2">
-          Setup Verification Page
-        </p>
+    <main className="flex h-screen w-full overflow-hidden">
+      {/* Column 1: Chat Interface */}
+      <div className="flex flex-col h-full w-full flex-1 border-r max-w-2xl">
+        <header className="flex items-center justify-between p-4 border-b">
+          <h1 className="text-xl font-semibold">AI PPT Chat</h1>
+          {/* We can add a "New Chat" button here later */}
+        </header>
 
-        <div className="mt-6">
-          <p className="mb-2 font-medium">Testing Shadcn Button:</p>
-          {/* Tests Tailwind styles and shadcn component import */}
-          <Button 
-            variant="destructive" 
-            size="lg"
-            className={cn("w-full max-w-xs")} // <-- Tests the cn() util from @/lib/utils
-          >
-            Setup Verified!
-          </Button>
-        </div>
+        {/* Replace the old placeholder divs
+          with our new single component
+        */}
+        <ChatInterface />
         
-        <div className="mt-8 text-left p-4 bg-card border rounded-md max-w-xs mx-auto">
-          <h3 className="font-semibold text-card-foreground">Checklist:</h3>
-          <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1">
-            <li>Tailwind v4 styles applied</li>
-            <li>Shadcn component rendered</li>
-            <li>`@/components` alias working</li>
-            <li>`@/lib/utils` alias working</li>
-          </ul>
+      </div>
+
+      {/* Column 2: PPT Preview */}
+      <div className="flex flex-col h-full flex-1">
+        <header className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-xl font-semibold">Preview</h2>
+          {/* Placeholder for Download/Edit buttons */}
+        </header>
+        
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">
+              PPT Preview will appear here...
+            </p>
+          </div>
         </div>
       </div>
     </main>
