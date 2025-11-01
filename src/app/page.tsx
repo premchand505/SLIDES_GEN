@@ -1,4 +1,5 @@
-import { ChatInterface } from '@/components/ChatInterface'; // <-- Import
+import { ChatInterface } from '@/components/ChatInterface';
+import { PPTPreview } from '@/components/PPTPreview'; // <-- Import
 
 export default function Home() {
   return (
@@ -7,12 +8,9 @@ export default function Home() {
       <div className="flex flex-col h-full w-full flex-1 border-r max-w-2xl">
         <header className="flex items-center justify-between p-4 border-b">
           <h1 className="text-xl font-semibold">AI PPT Chat</h1>
-          {/* We can add a "New Chat" button here later */}
         </header>
 
-        {/* Replace the old placeholder divs
-          with our new single component
-        */}
+        {/* This component is fully functional */}
         <ChatInterface />
         
       </div>
@@ -21,16 +19,14 @@ export default function Home() {
       <div className="flex flex-col h-full flex-1">
         <header className="flex items-center justify-between p-4 border-b">
           <h2 className="text-xl font-semibold">Preview</h2>
-          {/* Placeholder for Download/Edit buttons */}
+          {/* We will add a DownloadButton here in Phase 6 */}
         </header>
         
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">
-              PPT Preview will appear here...
-            </p>
-          </div>
-        </div>
+        {/* Replace the old placeholder div
+          with our new functional preview component
+        */}
+        <PPTPreview />
+
       </div>
     </main>
   );
