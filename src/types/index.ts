@@ -1,4 +1,24 @@
 /**
+ * Represents the structure of a single PowerPoint slide.
+ * This is the master type used by the AI, the store, and the generator.
+ */
+export type SlideContent = {
+  // Use a strict union for AI generation, but allow string for flexibility
+  layout: 'title' | 'content' | 'section' | 'twocolumn' | string;
+  title: string;      // Title is required
+  subtitle?: string;  // Subtitle is optional (for title slides)
+  content: string[];  // Array of bullet points or paragraphs
+};
+
+/**
+ * Represents the entire presentation data.
+ */
+export type PPTData = {
+  title?: string; // Optional overall presentation title
+  slides: SlideContent[];
+};
+
+/**
  * Represents a single message in the chat interface.
  */
 export type ChatMessage = {
@@ -6,24 +26,6 @@ export type ChatMessage = {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
-};
-
-/**
- * Represents the structure of a single PowerPoint slide.
- * This is the format we expect from the Gemini API.
- */
-export type SlideContent = {
-  title: string;
-  content: string[]; // Array of bullet points or paragraphs
-  layout: 'title' | 'content' | 'section' | 'twocolumn';
-};
-
-/**
- * Represents the entire presentation data.
- */
-export type PPTData = {
-  slides: SlideContent[];
-  // metadata can be expanded later (e.g., theme, author)
 };
 
 /**
@@ -37,8 +39,7 @@ export type AIAction = 'create' | 'edit' | 'add' | 'delete' | 'reorder';
 export type GeminiResponse = {
   action: AIAction;
   slides: SlideContent[];
-  // We can add a 'reasoning' field if we want the AI to explain its changes
-  reasoning?: string; 
+  reasoning?: string;
 };
 
 /**

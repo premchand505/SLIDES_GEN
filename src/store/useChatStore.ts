@@ -1,60 +1,31 @@
 import { create } from 'zustand';
-import { ChatStore, ChatMessage, PPTData } from '@/types';
+// Import ALL types from our new single source of truth
+import type { ChatStore, ChatMessage, PPTData } from '@/types';
 
-/**
- * The initial state for the chat store.
- */
+/* ---------- initial state ---------- */
 const initialState = {
-  messages: [],
-  pptData: null,
+  messages: [] as ChatMessage[],
+  pptData: null as PPTData | null,
   isLoading: false,
-  error: null,
+  error: null as string | null,
 };
 
-/**
- * Creates a persistent Zustand store for managing the chat state.
- */
-export const useChatStore = create<ChatStore>((set, get) => ({
+/* ---------- store ---------- */
+export const useChatStore = create<ChatStore>((set) => ({
   ...initialState,
 
-  /**
-   * Adds a new message to the chat history.
-   * @param message - The ChatMessage object to add.
-   */
-  addMessage: (message: ChatMessage) => {
+  addMessage: (message: ChatMessage) =>
     set((state) => ({
       messages: [...state.messages, message],
-    }));
-  },
+    })),
 
-  /**
-   * Updates the entire PPT data structure.
-   * @param newPPTData - The new PPTData object.
-   */
-  updatePPT: (newPPTData: PPTData) => {
-    set({ pptData: newPPTData });
-  },
+  updatePPT: (newPPTData: PPTData) => set({ pptData: newPPTData }),
 
-  /**
-   * Sets the global loading state (e.g., when waiting for AI).
-   * @param isLoading - Boolean flag.
-   */
-  setLoading: (isLoading: boolean) => {
-    set({ isLoading });
-  },
+  setLoading: (isLoading: boolean) => set({ isLoading }),
 
-  /**
-   * Sets or clears the global error state.
-   * @param error - An error message string or null.
-   */
-  setError: (error: string | null) => {
-    set({ error });
-  },
+  setError: (error: string | null) => set({ error }),
 
-  /**
-   * Resets the chat to its initial state.
-   */
-  clearChat: () => {
-    set(initialState);
-  },
+  clearChat: () => set(initialState),
 }));
+
+// --- ALL TYPE DEFINITIONS REMOVED FROM THE BOTTOM OF THIS FILE ---
