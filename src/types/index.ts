@@ -1,5 +1,5 @@
 /**
- * Represents the structure of a single PowerPoint slide.
+ * Represents the design styling for a slide
  */
 export type SlideDesign = {
   backgroundColor: string;
@@ -9,8 +9,16 @@ export type SlideDesign = {
   accentColor: string;
 };
 
+/**
+ * ✅ FIXED: Strict layout types only
+ */
+export type SlideLayout = 'title' | 'content' | 'section' | 'twocolumn';
+
+/**
+ * Represents the structure of a single PowerPoint slide.
+ */
 export type SlideContent = {
-  layout: 'title' | 'content' | 'section' | 'twocolumn' | string;
+  layout: SlideLayout; // ✅ Now type-safe
   title: string;
   subtitle?: string;
   content?: string[];
@@ -21,7 +29,7 @@ export type ThinkingStep = {
   type: 'thought' | 'action';
   tool?: 'webSearch' | 'readWebsite';
   content: string;
-  isStreaming?: boolean; // For live streaming indicator
+  isStreaming?: boolean;
 };
 
 /**
@@ -41,7 +49,7 @@ export type ChatMessage = {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
-  thinkingStep?: ThinkingStep; // NEW: Store thinking step data for styling
+  thinkingStep?: ThinkingStep;
 };
 
 /**

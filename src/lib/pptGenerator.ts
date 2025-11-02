@@ -1,21 +1,19 @@
-// NO 'use client' — runs only on the server
+// NO 'use client' – runs only on the server
 import PptxGenJS from 'pptxgenjs';
-import { PPTData, SlideDesign } from '@/types';
+import { PPTData, SlideDesign, SlideLayout } from '@/types';
 
 // --------------------------
-// Layout mapping (type-safe)
+// ✅ FIXED: Type-safe layout normalization
 // --------------------------
-const VALID_LAYOUT_KEYS = new Set(['title', 'content', 'section', 'twocolumn']);
-type LayoutKey = 'title' | 'content' | 'section' | 'twocolumn';
-
-// --------------------------
-// Helper function to normalize layout
-// --------------------------
-function normalizeLayout(rawLayout: string | undefined): LayoutKey {
-  const normalized = (rawLayout ?? 'content').toLowerCase().trim();
-  if (VALID_LAYOUT_KEYS.has(normalized)) {
-    return normalized as LayoutKey;
+function normalizeLayout(rawLayout: SlideLayout | undefined): SlideLayout {
+  if (!rawLayout) return 'content';
+  
+  const validLayouts: SlideLayout[] = ['title', 'content', 'section', 'twocolumn'];
+  
+  if (validLayouts.includes(rawLayout)) {
+    return rawLayout;
   }
+  
   console.warn(`[PPT Generator] Unknown layout "${rawLayout}". Using "content".`);
   return 'content';
 }
@@ -244,7 +242,7 @@ export const generatePresentationAsBase64 = async (
             fontFace: cleanedDesign.titleFont,
           });
 
-          if (slideData.content.length > 0) {
+          if (slideData.content && slideData.content.length > 0) {
             if (layoutKey === 'twocolumn') {
               // Two column with visual separator
               const mid = Math.ceil(slideData.content.length / 2);

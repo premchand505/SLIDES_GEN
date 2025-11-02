@@ -1,4 +1,4 @@
-import { SlideContent, SlideDesign } from '@/types';
+import { SlideContent, SlideDesign, SlideLayout } from '@/types';
 import { cn } from '@/lib/utils';
 
 // --------------------------
@@ -10,16 +10,18 @@ function cleanText(text: string | undefined): string {
 }
 
 // --------------------------
-// Layout mapping (type-safe)
+// ✅ FIXED: Type-safe layout normalization
 // --------------------------
-const VALID_LAYOUT_KEYS = new Set(['title', 'content', 'section', 'twocolumn']);
-type LayoutKey = 'title' | 'content' | 'section' | 'twocolumn';
-
-function normalizeLayout(rawLayout: string | undefined): LayoutKey {
-  const normalized = (rawLayout ?? 'content').toLowerCase().trim();
-  if (VALID_LAYOUT_KEYS.has(normalized)) {
-    return normalized as LayoutKey;
+function normalizeLayout(rawLayout: SlideLayout | undefined): SlideLayout {
+  if (!rawLayout) return 'content';
+  
+  const validLayouts: SlideLayout[] = ['title', 'content', 'section', 'twocolumn'];
+  
+  if (validLayouts.includes(rawLayout)) {
+    return rawLayout;
   }
+  
+  console.warn(`[SlideCard] Unknown layout "${rawLayout}". Using "content".`);
   return 'content';
 }
 
@@ -48,11 +50,7 @@ export function SlideCard({ slide, slideNumber, globalTheme }: SlideCardProps) {
   const subtitle = cleanText(slide.subtitle);
   const content = (slide.content || []).map(cleanText);
 
-  // 3. Helper to determine text color
-
-
-  // 4. Render the correct layout
-  // We use a 16:9 aspect ratio container to match the PPTX
+  // 3. Render the correct layout
   return (
     <div 
       className="w-full h-full aspect-video rounded-lg shadow-lg overflow-hidden relative border"
@@ -77,7 +75,10 @@ export function SlideCard({ slide, slideNumber, globalTheme }: SlideCardProps) {
       {/* Slide Number */}
       <div 
         className="absolute bottom-2 right-4 text-xs font-sans"
-        style={{ color: isColorDark(design.backgroundColor) ? '#FFFFFF' : '#000000', opacity: 0.5 }}
+        style={{ 
+          color: isColorDark(design.backgroundColor) ? '#FFFFFF' : '#000000', 
+          opacity: 0.5 
+        }}
       >
         {slideNumber}
       </div>
@@ -99,7 +100,6 @@ interface TitleSlideProps extends SlideProps {
 }
 
 function TitleSlide({ design, title, subtitle }: TitleSlideProps) {
-  // This mimics the gradient/shape design from your generator
   const lightAccent = lightenColor(design.accentColor.replace('#', ''), 0.2);
   const darkAccent = darkenColor(design.accentColor.replace('#', ''), 0.2);
   
@@ -108,7 +108,7 @@ function TitleSlide({ design, title, subtitle }: TitleSlideProps) {
       className="w-full h-full relative flex flex-col items-center justify-center p-8"
       style={{ backgroundColor: design.accentColor }}
     >
-      {/* Decorative Shapes (mimicking generator) */}
+      {/* Decorative Shapes */}
       <div 
         className="absolute w-[30%] h-[50%] rounded-full"
         style={{ backgroundColor: `#${lightAccent}`, opacity: 0.4, top: '-10%', right: '-10%' }}
@@ -148,7 +148,6 @@ function TitleSlide({ design, title, subtitle }: TitleSlideProps) {
 }
 
 function SectionSlide({ design, title }: SlideProps) {
-  // This mimics the "split" design
   return (
     <div className="w-full h-full flex" style={{ backgroundColor: design.backgroundColor }}>
       {/* Left Color Panel */}
@@ -168,7 +167,6 @@ function SectionSlide({ design, title }: SlideProps) {
           style={{ backgroundColor: '#FFFFFF' }}
         />
       </div>
-      {/* Right side is just the slide background */}
     </div>
   );
 }
@@ -179,7 +177,6 @@ interface ContentSlideProps extends SlideProps {
 }
 
 function ContentSlide({ design, title, content, isTwoColumn }: ContentSlideProps) {
-  // This mimics the "header bar" design
   const darkAccent = darkenColor(design.accentColor.replace('#', ''), 0.2);
 
   return (
@@ -236,7 +233,7 @@ function ContentColumn({ content }: { content: string[] }) {
 }
 
 // --------------------------
-// Color helper functions (from your generator)
+// Color helper functions
 // --------------------------
 function lightenColor(hexColor: string, percent: number): string {
   const num = parseInt(hexColor, 16);
@@ -255,7 +252,7 @@ function darkenColor(hexColor: string, percent: number): string {
 }
 
 function isColorDark(hexColor: string): boolean {
-  const num = parseInt(hexColor, 16);
+  const num = parseInt(hexColor.replace('#', ''), 16);
   const r = (num >> 16) & 0xFF;
   const g = (num >> 8) & 0xFF;
   const b = num & 0xFF;
