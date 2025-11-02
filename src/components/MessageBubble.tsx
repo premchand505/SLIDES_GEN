@@ -19,7 +19,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
           <Sparkles className="w-4 h-4 text-primary" />
         </div>
-        <div className="flex-1 bg-gradient-to-br from-muted/40 to-muted/20 rounded-2xl p-5 border border-border/50 max-w-[85%] shadow-sm">
+        <div className="flex-1 bg-linear-to-br from-muted/40 to-muted/20 rounded-2xl p-5 border border-border/50 max-w-[85%] shadow-sm">
           <div className="text-xs font-semibold text-primary/80 mb-3 uppercase tracking-wider">
             Thinking
           </div>

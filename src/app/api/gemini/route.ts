@@ -18,7 +18,7 @@ const model = genAI.getGenerativeModel({
 });
 
 const generationConfig: GenerationConfig = {
-  temperature: 0.7,
+  temperature: 0.8,
   topK: 40,
   topP: 0.95,
   maxOutputTokens: 8192,
@@ -137,27 +137,52 @@ You must return the COMPLETE updated presentation with ALL slides.`;
     contextInstruction = `Create a NEW presentation from scratch.`;
   }
 
-  return `You are an expert AI presentation designer. Create beautiful, professional slide decks.
+  return `You are an expert AI presentation designer with research capabilities.
+
+CRITICAL: You MUST output valid JSON at the end. This is non-negotiable.
+
+Create comprehensive, well-researched slide decks.
 
 ${contextInstruction}
 
-RESPONSE FORMAT (FOLLOW EXACTLY):
+RESPONSE FORMAT - FOLLOW THIS STRUCTURE:
 
-Step 1: Think through your approach using <thought> tags:
-<thought>Your planning and reasoning here</thought>
-<thought>Design decisions here</thought>
+Step 1: RESEARCH PHASE - Show your research process using specific action tags:
 
-Step 2: After all thinking, write EXACTLY this line:
+<thought>Initial planning and defining scope</thought>
+
+<action tool="webSearch">
+Search query about the topic
+</action>
+
+<thought>Analyzing search results and selecting sources</thought>
+
+<action tool="readWebsite">
+https://www.example.com/article-url
+</action>
+
+<thought>Synthesizing information from the source</thought>
+
+Continue this pattern - search multiple sources, read websites, analyze information.
+IMPORTANT: 
+- Use <thought> tags for your reasoning (no asterisks, clean prose)
+- Use <action tool="webSearch"> when you need to search for information
+- Use <action tool="readWebsite"> when you want to read a specific URL
+- Provide 4-8 thinking steps minimum, showing thorough research
+- Each <thought> should be substantial (2-4 sentences minimum)
+- Show your process: define scope → search → analyze → synthesize → design
+
+Step 2: After all research and thinking, write EXACTLY:
 <<<JSON_START>>>
 
-Step 3: Immediately output your JSON (no extra text, no markdown blocks):
+Step 3: Output the JSON for the presentation (no markdown blocks):
 
 REQUIRED JSON STRUCTURE:
 {
   "action": "create",
   "globalTheme": {
     "backgroundColor": "#FFFFFF",
-    "textColor": "#1A1A1A", 
+    "textColor": "#1A1A1A",
     "titleFont": "Arial",
     "bodyFont": "Calibri",
     "accentColor": "#3B82F6"
@@ -166,42 +191,89 @@ REQUIRED JSON STRUCTURE:
     {
       "layout": "title",
       "title": "Your Title",
-      "subtitle": "Your Subtitle",
+      "subtitle": "Your Subtitle", 
       "content": [],
-      "design": {
-        "backgroundColor": "#FFFFFF",
-        "textColor": "#1A1A1A",
-        "titleFont": "Arial", 
-        "bodyFont": "Calibri",
-        "accentColor": "#3B82F6"
-      }
+      "design": {...}
+    },
+    {
+      "layout": "content",
+      "title": "Slide Title",
+      "content": ["Point 1", "Point 2", "Point 3"],
+      "design": {...}
     }
   ]
 }
 
-RULES:
-- Each slide must have: layout, title, content (array), design
-- Layouts: "title", "content", "section", "twocolumn"
-- content is an array of strings (bullet points)
-- Use double quotes for all strings
-- No trailing commas
-- Apply globalTheme to all slides
-
-EXAMPLE OUTPUT:
+EXAMPLE COMPLETE RESPONSE:
 
 <thought>
-Creating a 3-slide presentation about AI:
-1. Title slide - "Introduction to AI"
-2. Content slide - "What is AI?"
-3. Content slide - "Applications"
+Defining the Scope
+
+The user wants a presentation about Artificial Intelligence. I need to cover the fundamentals, applications, benefits, challenges, and future outlook. My goal is to create an informative yet accessible presentation suitable for a general audience. I'll need to research current definitions, real-world applications, and expert perspectives on AI's trajectory.
+</thought>
+
+<action tool="webSearch">
+What is Artificial Intelligence definition types
+</action>
+
+<thought>
+Researching Foundational Concepts
+
+I've found several authoritative sources on AI. I'll focus on gathering information from academic and industry-standard definitions to ensure accuracy. The search results include IBM's AI overview, Stanford's AI research, and Wikipedia's comprehensive article. Let me read the IBM source first for a business-oriented perspective.
+</thought>
+
+<action tool="readWebsite">
+https://www.ibm.com/topics/artificial-intelligence
+</action>
+
+<thought>
+Analyzing IBM's Perspective
+
+The IBM article provides a solid foundation covering AI definition, machine learning, deep learning, and neural networks. It emphasizes AI's practical business applications. Now I need to gather information about real-world applications across different industries to make the presentation more concrete and relatable.
+</thought>
+
+<action tool="webSearch">
+AI applications in healthcare finance education 2024
+</action>
+
+<thought>
+Exploring Industry Applications
+
+The search reveals fascinating use cases: AI in medical diagnostics, personalized learning platforms, fraud detection in banking, and autonomous vehicles. These examples will make excellent content for demonstrating AI's real-world impact. I should also research the challenges and ethical considerations to provide a balanced view.
+</thought>
+
+<action tool="webSearch">
+AI challenges ethics concerns bias
+</action>
+
+<thought>
+Understanding Challenges and Ethics
+
+I've gathered information about AI bias, privacy concerns, job displacement fears, and the need for regulation. This is crucial for a complete presentation. Now I have enough information to structure a comprehensive 6-slide presentation covering: introduction, definition, applications, benefits, challenges, and future outlook.
 </thought>
 
 <thought>
-Design: Clean white background, blue accents for tech theme, Arial/Calibri fonts for readability.
+Designing the Presentation
+
+For the design, I'll use a modern, tech-forward aesthetic with a clean white background and blue accent color to convey trust and innovation. Arial for titles provides clarity, while Calibri for body text ensures readability. The presentation will flow logically from concepts to applications to implications, making it engaging and informative.
 </thought>
 
 <<<JSON_START>>>
-{"action":"create","globalTheme":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"},"slides":[{"layout":"title","title":"Introduction to AI","subtitle":"The Future of Technology","content":[],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"What is AI?","content":["Artificial intelligence simulates human intelligence","Includes machine learning and deep learning","Enables computers to learn from experience"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}}]}`;
+{"action":"create","globalTheme":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"},"slides":[{"layout":"title","title":"Artificial Intelligence","subtitle":"Transforming Our World Through Intelligent Systems","content":[],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"What is AI?","content":["Simulation of human intelligence processes by machines and computer systems","Encompasses machine learning, deep learning, neural networks, and natural language processing","Systems that can learn from experience, adjust to new inputs, and perform human-like tasks","Enables computers to process vast amounts of data and identify patterns beyond human capability"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"Real-World Applications","content":["Healthcare: AI-powered diagnostics, drug discovery, and personalized treatment plans","Finance: Fraud detection, algorithmic trading, and risk assessment","Education: Adaptive learning platforms and intelligent tutoring systems","Transportation: Autonomous vehicles and traffic optimization","Customer Service: Chatbots and virtual assistants providing 24/7 support"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"Benefits of AI","content":["Automation of repetitive tasks increases efficiency and productivity","Enhanced decision-making through data-driven insights and predictions","24/7 availability without human limitations like fatigue","Ability to process and analyze massive datasets in real-time","Cost reduction through optimized operations and resource allocation"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"Challenges & Considerations","content":["Algorithmic bias and fairness concerns in AI decision-making","Privacy issues related to data collection and usage","Potential job displacement and workforce transformation","Need for transparency and explainability in AI systems","Ethical frameworks and regulatory oversight requirements"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"The Future of AI","content":["Continued advancement in natural language understanding and generation","Integration of AI across all industries and daily life","Development of more ethical and transparent AI systems","Collaboration between humans and AI to augment capabilities","Focus on AI safety, alignment, and beneficial outcomes for humanity"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}}]}
+
+CRITICAL RULES:
+- Minimum 4-8 <thought> blocks showing detailed research process
+- Use <action> tags for web searches and website reading
+- Each thought should be 2-4 sentences, no bullet points, no asterisks
+- Make thoughts substantial and informative
+- After research, you MUST output <<<JSON_START>>> on its own line
+- Then immediately output ONLY the JSON object with no extra text
+- The JSON must be valid and parseable
+- Do not wrap JSON in markdown code blocks
+- Do not add any text after the JSON
+- Create 5-8 slides minimum for comprehensive coverage
+
+MANDATORY: The response must end with valid JSON after <<<JSON_START>>>. If you do not include the JSON, the system will fail.`;
 };
 
 export async function POST(request: Request) {
@@ -219,9 +291,9 @@ export async function POST(request: Request) {
     }
 
     const systemInstruction = getSystemInstruction(currentPPT);
-    const fullPrompt = `${systemInstruction}\n\n=== USER REQUEST ===\n${prompt}`;
+    const fullPrompt = `${systemInstruction}\n\n=== USER REQUEST ===\n${prompt}\n\nRemember: Show your research process with multiple <thought> and <action> tags before generating the presentation JSON.`;
 
-    console.log('🚀 Starting generation...');
+    console.log('🚀 Starting generation with research...');
 
     const result = await model.generateContentStream({
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
@@ -246,7 +318,8 @@ export async function POST(request: Request) {
 
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           console.log('📦 RESPONSE LENGTH:', fullResponseText.length);
-          console.log('📝 LAST 500 CHARS:', fullResponseText.slice(-500));
+          console.log('📝 FULL RESPONSE:');
+          console.log(fullResponseText);
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
           // Extract JSON using multiple strategies
@@ -254,7 +327,6 @@ export async function POST(request: Request) {
 
           if (!jsonText) {
             console.error('❌ FAILED TO EXTRACT JSON');
-            console.error('Full response:', fullResponseText);
             const errorMsg = { 
               type: "error", 
               error: "Could not extract JSON from AI response. Please try again." 
@@ -265,7 +337,6 @@ export async function POST(request: Request) {
           }
 
           console.log('✅ EXTRACTED JSON LENGTH:', jsonText.length);
-          console.log('📄 JSON PREVIEW:', jsonText.substring(0, 300));
 
           // Parse the JSON
           const parsedData: GeminiResponse = JSON.parse(jsonText);

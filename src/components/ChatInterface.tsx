@@ -40,7 +40,7 @@ export function ChatInterface() {
   }, [storeMessages]);
 
   /**
-   * Extract all complete <thought> tags from text
+   * Extract all complete <thought> and <action> tags from text
    */
   const extractThoughtSteps = (text: string): ThinkingStep[] => {
     const steps: ThinkingStep[] = [];
@@ -59,16 +59,59 @@ export function ChatInterface() {
       }
     }
 
-    // Check for incomplete thought (currently streaming)
+    // Find all complete <action tool="...">...</action> tags
+    const actionRegex = /<action\s+tool="(webSearch|readWebsite)">([\s\S]*?)<\/action>/g;
+    
+    while ((match = actionRegex.exec(text)) !== null) {
+      const tool = match[1] as 'webSearch' | 'readWebsite';
+      const content = match[2].trim();
+      if (content) {
+        steps.push({
+          type: 'action',
+          tool: tool,
+          content: content,
+        });
+      }
+    }
+
+    // Sort steps by their position in the original text to maintain order
+    steps.sort((a, b) => {
+      const aIndex = text.indexOf(a.content);
+      const bIndex = text.indexOf(b.content);
+      return aIndex - bIndex;
+    });
+
+    // Check for incomplete tags (currently streaming)
     const lastThoughtStart = text.lastIndexOf('<thought>');
     const lastThoughtEnd = text.lastIndexOf('</thought>');
+    const lastActionStart = text.lastIndexOf('<action');
+    const lastActionEnd = text.lastIndexOf('</action>');
     
-    if (lastThoughtStart > lastThoughtEnd) {
-      // There's an unclosed thought tag - extract the streaming content
+    // Check which tag is streaming (most recent unclosed tag)
+    const streamingThought = lastThoughtStart > lastThoughtEnd;
+    const streamingAction = lastActionStart > lastActionEnd;
+    
+    if (streamingThought && lastThoughtStart > lastActionStart) {
       const streamingContent = text.substring(lastThoughtStart + 9).trim();
       if (streamingContent && streamingContent.length > 0) {
         steps.push({
           type: 'thought',
+          content: streamingContent,
+          isStreaming: true,
+        });
+      }
+    } else if (streamingAction && lastActionStart > lastThoughtStart) {
+      // Extract tool type
+      const toolMatch = text.substring(lastActionStart).match(/tool="(webSearch|readWebsite)"/);
+      const tool = toolMatch ? (toolMatch[1] as 'webSearch' | 'readWebsite') : undefined;
+      
+      const actionStartTag = text.substring(lastActionStart).indexOf('>') + lastActionStart + 1;
+      const streamingContent = text.substring(actionStartTag).trim();
+      
+      if (streamingContent && streamingContent.length > 0 && tool) {
+        steps.push({
+          type: 'action',
+          tool: tool,
           content: streamingContent,
           isStreaming: true,
         });
