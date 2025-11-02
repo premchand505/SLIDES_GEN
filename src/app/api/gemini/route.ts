@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server';
 import { generateSlides } from '@/lib/gemini';
-import { ChatMessage } from '@/types';
+import { PPTData } from '@/types'; // Import PPTData
 
 /**
  * POST handler for the /api/gemini route.
- * Receives user input and returns a structured slide presentation.
+ * Receives user input and (optionally) the current presentation
+ * to generate or edit slides.
  */
 export async function POST(request: Request) {
   try {
-    // We'll expect a body like { prompt: string, history: ChatMessage[] }
+    // 1. Parse the new body structure
     const body = await request.json();
-    const { prompt } = body as { prompt: string; history: ChatMessage[] };
+    const { prompt, currentPPT } = body as { 
+      prompt: string; 
+      currentPPT: PPTData | null; // <-- Get the current presentation
+    };
 
     if (!prompt) {
       return NextResponse.json(
@@ -19,9 +23,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Call our server-side helper function
-    // We pass the prompt and (eventually) the history for context
-    const geminiResponse = await generateSlides(prompt);
+    // 2. Pass both prompt and currentPPT to the helper
+    const geminiResponse = await generateSlides(prompt, currentPPT);
 
     // Return the successful JSON response from Gemini
     return NextResponse.json(geminiResponse, { status: 200 });
