@@ -8,7 +8,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { AnimatePresence, motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { Plus, Home, Presentation, X } from 'lucide-react';
+import { Plus, Home, Presentation} from 'lucide-react';
 import { AppShell } from '@/components/Appshell';
 import { useGeneration } from '@/hooks/useGeneration';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';

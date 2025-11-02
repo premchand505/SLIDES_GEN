@@ -68,10 +68,8 @@
   }
 }
 
-/* THIS IS THE FIX:
-  Do not use '@apply' for base body styles. 
-  Apply the CSS variables directly.
-*/
+
+
 @layer base {
   * {
     border-color: hsl(var(--border));

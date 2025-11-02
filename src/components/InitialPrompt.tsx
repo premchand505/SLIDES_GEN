@@ -48,7 +48,7 @@ export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
         <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-primary/10 mb-3 md:mb-4">
           <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-primary" />
         </div>
-        <h2 className="text-2xl md:text-4xl font-bold mb-2">Welcome to AI PPT Chat</h2>
+        <h2 className="text-2xl md:text-4xl font-bold mb-2">Welcome to SLIDES GEN</h2>
         <p className="text-sm md:text-lg text-muted-foreground px-4">
           Generate professional slides in seconds with AI
         </p>
