@@ -6,23 +6,12 @@ import { ChatInput } from '@/components/ChatInput';
 import { MessageBubble } from '@/components/MessageBubble';
 import { InitialPrompt } from '@/components/InitialPrompt';
 import { toast } from 'sonner';
-import { ChatMessage } from '@/types';
+import { ChatMessage, ThinkingStep } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
-import { ThinkingBubble, ThinkingStep } from '@/components/ThinkingBubble'; // Import ThinkingBubble
+import { ThinkingBubble } from '@/components/ThinkingBubble';
 
-const STREAM_SEPARATOR = "\n[__DATA_SEPARATOR__]\n";
-const tagRegex = /<(\w+)(?:\s+tool="([^"]+)")?>([\s\S]*?)<\/\1>/g;
-
-// Helper function to clean markdown and code blocks from display
-function cleanStreamingText(text: string): string {
-  const jsonStart = text.indexOf('```json');
-  if (jsonStart !== -1) {
-    return text.substring(0, jsonStart).trim();
-  }
-  return text.replace(/```[\s\S]*?```/g, '').trim();
-}
+const STREAM_SEPARATOR = "\n<<<JSON_START>>>\n";
 
 export function ChatInterface() {
   const { 
@@ -34,7 +23,7 @@ export function ChatInterface() {
 
   const [uiMessages, setUiMessages] = useState<ChatMessage[]>(storeMessages);
   const [isLoading, setIsLoading] = useState(false);
-  const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
+  const [streamingSteps, setStreamingSteps] = useState<ThinkingStep[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -44,45 +33,55 @@ export function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [uiMessages, thinkingSteps]);
+  }, [uiMessages, streamingSteps]);
 
   useEffect(() => {
     setUiMessages(storeMessages);
   }, [storeMessages]);
 
   /**
-   * This is the new parser function.
-   * It finds tags in the text and adds them to the state.
+   * Extract all complete <thought> tags from text
    */
-  const parseAndSetSteps = (text: string, startIndex: number): number => {
+  const extractThoughtSteps = (text: string): ThinkingStep[] => {
+    const steps: ThinkingStep[] = [];
+    
+    // Find all complete <thought>...</thought> tags
+    const thoughtRegex = /<thought>([\s\S]*?)<\/thought>/g;
     let match;
-    let newLastIndex = startIndex;
-    const regex = new RegExp(tagRegex.source, 'gs');
-    regex.lastIndex = startIndex;
     
-    const stepsToAdd: ThinkingStep[] = [];
-    
-    while ((match = regex.exec(text)) !== null) {
-      const type = match[1] as 'thought' | 'action';
-      const tool = match[2] as ThinkingStep['tool'] | undefined;
-      const content = match[3];
-
-      stepsToAdd.push({ type, tool, content });
-      newLastIndex = regex.lastIndex;
+    while ((match = thoughtRegex.exec(text)) !== null) {
+      const content = match[1].trim();
+      if (content) {
+        steps.push({
+          type: 'thought',
+          content: content,
+        });
+      }
     }
 
-    if (stepsToAdd.length > 0) {
-      setThinkingSteps(prev => [...prev, ...stepsToAdd]);
+    // Check for incomplete thought (currently streaming)
+    const lastThoughtStart = text.lastIndexOf('<thought>');
+    const lastThoughtEnd = text.lastIndexOf('</thought>');
+    
+    if (lastThoughtStart > lastThoughtEnd) {
+      // There's an unclosed thought tag - extract the streaming content
+      const streamingContent = text.substring(lastThoughtStart + 9).trim();
+      if (streamingContent && streamingContent.length > 0) {
+        steps.push({
+          type: 'thought',
+          content: streamingContent,
+          isStreaming: true,
+        });
+      }
     }
     
-    return newLastIndex;
+    return steps;
   };
 
   const handleChatSubmit = async (input: string) => {
     setIsLoading(true);
-    setThinkingSteps([]); // Clear old steps
+    setStreamingSteps([]);
 
-    // Create and add the user message
     const userMessage: ChatMessage = {
       id: uuidv4(),
       role: 'user',
@@ -92,10 +91,8 @@ export function ChatInterface() {
     addMessage(userMessage);
     setUiMessages(prev => [...prev, userMessage]);
 
-    const aiMessageId = uuidv4(); // We'll use this for the final message
-
-    let accumulatedText = ""; // Store the full response
-    let lastParsedIndex = 0; // For streaming steps
+    let accumulatedText = "";
+    let previousStepCount = 0;
 
     try {
       const response = await fetch('/api/gemini', {
@@ -114,67 +111,107 @@ export function ChatInterface() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      // --- THIS IS THE CORRECTED STREAMING LOGIC ---
+      console.log('🔄 Starting stream...');
+
+      // Stream processing
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break; // Exit the loop when stream is finished
+        if (done) break;
         
         const chunk = decoder.decode(value, { stream: true });
         accumulatedText += chunk;
 
-        // We only update the 'thinking steps' UI, we never parse JSON here.
-        // We check if the separator has NOT been found yet.
-        if (!accumulatedText.includes(STREAM_SEPARATOR)) {
-          lastParsedIndex = parseAndSetSteps(accumulatedText, lastParsedIndex);
+        // Check if JSON part has started
+        if (accumulatedText.includes(STREAM_SEPARATOR)) {
+          // Clear streaming steps once we hit the JSON
+          setStreamingSteps([]);
+          break;
         }
+
+        // Still in thinking phase - extract and update steps
+        const currentSteps = extractThoughtSteps(accumulatedText);
+        
+        // Convert completed steps to messages
+        const completedSteps = currentSteps.filter(step => !step.isStreaming);
+        
+        // If we have new completed steps, save them as messages
+        if (completedSteps.length > previousStepCount) {
+          const newSteps = completedSteps.slice(previousStepCount);
+          
+          newSteps.forEach(step => {
+            const thinkingMessage: ChatMessage = {
+              id: uuidv4(),
+              role: 'model',
+              content: step.content,
+              timestamp: new Date(),
+              thinkingStep: step,
+            };
+            addMessage(thinkingMessage);
+            setUiMessages(prev => [...prev, thinkingMessage]);
+          });
+          
+          previousStepCount = completedSteps.length;
+        }
+        
+        // Show only the currently streaming step (if any)
+        const streamingStep = currentSteps.find(step => step.isStreaming);
+        setStreamingSteps(streamingStep ? [streamingStep] : []);
       }
-      // --- END OF WHILE LOOP ---
 
-      // The stream is DONE. Now, we process the complete 'accumulatedText'.
-      setThinkingSteps([]); // Clear the thinking bubbles
+      console.log('✅ Stream complete');
+      setStreamingSteps([]);
 
-      if (accumulatedText.includes(STREAM_SEPARATOR)) {
-        const parts = accumulatedText.split(STREAM_SEPARATOR);
-        const reasoningText = cleanStreamingText(parts[0]);
-        const jsonDataString = parts[1];
+      // Continue reading to get the JSON part
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulatedText += decoder.decode(value, { stream: true });
+      }
 
-        if (jsonDataString) {
-          try {
-            // This parse is now safe because the string is complete.
-            const doneData = JSON.parse(jsonDataString.trim());
-            
-            if (doneData.type === 'done') {
-              // Success - save final message
-              const finalMessage: ChatMessage = {
-                id: aiMessageId,
-                role: 'model',
-                content: reasoningText || `Successfully created ${doneData.data.slides.length} slides.`,
-                timestamp: new Date(),
-              };
-              addMessage(finalMessage);
-              setUiMessages(prev => [...prev, finalMessage]);
-              updatePPT(doneData.data);
-            } else {
-              throw new Error(doneData.error || 'Unknown error from API');
-            }
-          } catch (e) {
-            console.error("Failed to parse final JSON:", e);
-            throw new Error("Failed to parse response from AI");
-          }
-        } else {
-          throw new Error("No JSON data found after separator.");
-        }
+      // Extract and parse JSON
+      if (!accumulatedText.includes(STREAM_SEPARATOR)) {
+        throw new Error("Invalid response format - no JSON separator found");
+      }
+
+      const parts = accumulatedText.split(STREAM_SEPARATOR);
+      const jsonText = parts[parts.length - 1]?.trim();
+
+      if (!jsonText) {
+        throw new Error("No JSON data received");
+      }
+
+      console.log('📦 Parsing JSON...');
+      const doneData = JSON.parse(jsonText);
+      
+      if (doneData.type === 'done' && doneData.data) {
+        const slideCount = doneData.data.slides?.length || 0;
+        console.log('✅ Generated', slideCount, 'slides');
+        
+        const finalMessage: ChatMessage = {
+          id: uuidv4(),
+          role: 'model',
+          content: `✓ Generated ${slideCount} slide${slideCount !== 1 ? 's' : ''}`,
+          timestamp: new Date(),
+        };
+        addMessage(finalMessage);
+        setUiMessages(prev => [...prev, finalMessage]);
+        updatePPT(doneData.data);
+        
+        toast.success(`${slideCount} slides created!`);
+        
+      } else if (doneData.type === 'error') {
+        throw new Error(doneData.error || 'Unknown error from API');
       } else {
-        // The stream finished but never sent the separator
-        throw new Error("Invalid response format from AI.");
+        throw new Error('Invalid response format');
       }
 
     } catch (err) {
       const message = err instanceof Error ? err.message : "An unknown error occurred";
+      console.error("❌ Error:", message);
       toast.error(message);
       
       const errorMessage: ChatMessage = {
-        id: aiMessageId,
+        id: uuidv4(),
         role: 'model',
         content: `Error: ${message}`,
         timestamp: new Date(),
@@ -183,7 +220,7 @@ export function ChatInterface() {
       setUiMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      setThinkingSteps([]); // Clear steps on finish or error
+      setStreamingSteps([]);
     }
   };
 
@@ -211,7 +248,7 @@ export function ChatInterface() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {uiMessages.map((msg) => (
               <MessageBubble 
                 key={msg.id} 
@@ -219,26 +256,14 @@ export function ChatInterface() {
               />
             ))}
             
-            {/* Streaming message indicator */}
-            {thinkingSteps.map((step, index) => (
-              <ThinkingBubble key={index} step={step} />
-            ))}
-            
-            {/* Simple loading indicator */}
-            {isLoading && thinkingSteps.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 items-center"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Thinking...
-                </div>
-              </motion.div>
-            )}
+            <AnimatePresence>
+              {streamingSteps.map((step, index) => (
+                <ThinkingBubble 
+                  key={`streaming-${index}`} 
+                  step={step} 
+                />
+              ))}
+            </AnimatePresence>
             
             <div ref={messagesEndRef} />
           </div>

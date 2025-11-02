@@ -1,16 +1,19 @@
 import type { Config } from 'tailwindcss'
-import animate from 'tailwindcss-animate' // <-- Use import instead of require
+import animate from 'tailwindcss-animate'
 
 const config = {
-  // 'darkMode' is set to 'class' as a string, not an array.
   darkMode: 'class',
   
+  // --- THIS IS THE CRITICAL FIX ---
+  // The paths MUST point inside your 'src' folder.
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/lib/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/store/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  // --- END FIX ---
+
   prefix: '',
   theme: {
     container: {
@@ -77,7 +80,6 @@ const config = {
       },
     },
   },
-  // Use the imported module here
   plugins: [animate],
 
 } satisfies Config

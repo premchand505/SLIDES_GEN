@@ -46,10 +46,10 @@ export function SlideCard({ slide, slideNumber, globalTheme }: SlideCardProps) {
   const layoutKey = normalizeLayout(slide.layout);
   const title = cleanText(slide.title);
   const subtitle = cleanText(slide.subtitle);
-  const content = slide.content.map(cleanText);
+  const content = (slide.content || []).map(cleanText);
 
   // 3. Helper to determine text color
-  const contrastTextColor = '#FFFFFF';
+
 
   // 4. Render the correct layout
   // We use a 16:9 aspect ratio container to match the PPTX

@@ -7,7 +7,6 @@ import {
 } from "@google/generative-ai";
 import { PPTData, GeminiResponse } from "@/types";
 
-// --- Initialize the Google SDK ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY is not defined in environment variables.");
@@ -18,7 +17,6 @@ const model = genAI.getGenerativeModel({
   model: "gemini-2.5-pro-preview-05-06",
 });
 
-// --- Config ---
 const generationConfig: GenerationConfig = {
   temperature: 0.7,
   topK: 40,
@@ -33,82 +31,179 @@ const safetySettings: SafetySetting[] = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-// --- THIS IS THE UNIQUE SEPARATOR (must match frontend) ---
-const STREAM_SEPARATOR = "\n[__DATA_SEPARATOR__]\n";
+const STREAM_SEPARATOR = "\n<<<JSON_START>>>\n";
 
-// --- NEW SYSTEM PROMPT ---
+function extractJSON(text: string): string | null {
+  console.log('🔍 Attempting to extract JSON from text...');
+  
+  // Method 1: Look for our custom separator
+  const separators = ['<<<JSON_START>>>', '<<<json_start>>>', 'JSON_START', 'json_start'];
+  for (const sep of separators) {
+    if (text.includes(sep)) {
+      console.log('✅ Found separator:', sep);
+      const parts = text.split(sep);
+      let jsonPart = parts[parts.length - 1].trim();
+      
+      // Clean markdown if present
+      jsonPart = jsonPart.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+      
+      if (jsonPart && jsonPart.startsWith('{')) {
+        return jsonPart;
+      }
+    }
+  }
+  
+  console.log('⚠️ No separator found, trying regex patterns...');
+  
+  // Method 2: Look for JSON object pattern starting with action/slides
+  const patterns = [
+    /\{[\s\S]*?"action"[\s\S]*?"slides"[\s\S]*?\}(?:\}(?:\})?)*/,
+    /\{[\s\S]*?"slides"[\s\S]*?"action"[\s\S]*?\}(?:\}(?:\})?)*/,
+    /\{[\s\S]*?"globalTheme"[\s\S]*?"slides"[\s\S]*?\}(?:\}(?:\})?)*/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      console.log('✅ Found JSON via regex');
+      let jsonStr = match[0];
+      
+      // Clean markdown
+      jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+      
+      // Balance braces
+      let braceCount = 0;
+      let endIdx = -1;
+      for (let i = 0; i < jsonStr.length; i++) {
+        if (jsonStr[i] === '{') braceCount++;
+        if (jsonStr[i] === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            endIdx = i + 1;
+            break;
+          }
+        }
+      }
+      
+      if (endIdx > 0) {
+        return jsonStr.substring(0, endIdx);
+      }
+    }
+  }
+  
+  console.log('⚠️ Regex failed, trying last resort...');
+  
+  // Method 3: Find last complete JSON object in text
+  const lastOpenBrace = text.lastIndexOf('{');
+  if (lastOpenBrace !== -1) {
+    const testText = text.substring(lastOpenBrace);
+    
+    // Try to find complete object
+    let braceCount = 0;
+    let endIdx = -1;
+    for (let i = 0; i < testText.length; i++) {
+      if (testText[i] === '{') braceCount++;
+      if (testText[i] === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          endIdx = i + 1;
+          break;
+        }
+      }
+    }
+    
+    if (endIdx > 0) {
+      const jsonCandidate = testText.substring(0, endIdx);
+      // Check if it looks like our data structure
+      if (jsonCandidate.includes('slides') || jsonCandidate.includes('action')) {
+        console.log('✅ Found JSON by brace matching');
+        return jsonCandidate;
+      }
+    }
+  }
+  
+  console.error('❌ All extraction methods failed');
+  return null;
+}
+
 const getSystemInstruction = (currentPPT: PPTData | null): string => {
-  const jsonSchema = `
-  type SlideDesign = {
-    backgroundColor: string;
-    textColor: string;
-    titleFont: string;
-    bodyFont: string;
-    accentColor: string;
-  };
-
-  type SlideContent = {
-    layout: 'title' | 'content' | 'section' | 'twocolumn';
-    title: string;
-    subtitle?: string;
-    content: string[];
-    design?: SlideDesign;
-  };
-
-  type GeminiResponse = {
-    action: 'create' | 'edit' | 'add' | 'delete' | 'reorder';
-    globalTheme?: SlideDesign;
-    slides: SlideContent[];
-    reasoning?: string;
-  };
-  `;
-
   let contextInstruction: string;
   if (currentPPT) {
-    contextInstruction = `The user wants to edit this presentation:
+    contextInstruction = `EXISTING PRESENTATION TO EDIT:
 ${JSON.stringify(currentPPT, null, 2)}
-You MUST return the *complete, updated* presentation JSON.`;
+
+You must return the COMPLETE updated presentation with ALL slides.`;
   } else {
-    contextInstruction = `The user wants a new presentation.`;
+    contextInstruction = `Create a NEW presentation from scratch.`;
   }
 
-  return `
-You are an expert AI presentation designer.
-Your task is to generate both the CONTENT and the DESIGN for a presentation.
+  return `You are an expert AI presentation designer. Create beautiful, professional slide decks.
 
 ${contextInstruction}
 
-**CRITICAL RESPONSE FORMAT:**
-You MUST respond in two parts:
-1.  **STRUCTURED REASONING LOG:** Stream your thought process as XML-like tags.
-    - For thinking: <thought>Your reasoning here...</thought>
-    - For actions: <action tool="webSearch">Searching for...</action>
-    - For reading: <action tool="readWebsite">Reading example.com...</action>
+RESPONSE FORMAT (FOLLOW EXACTLY):
 
-2.  **FINAL JSON DATA:** After your *entire* reasoning log, output this separator and JSON:
-${STREAM_SEPARATOR}
-{ "type": "done", "data": { ...your GeminiResponse JSON... } }
+Step 1: Think through your approach using <thought> tags:
+<thought>Your planning and reasoning here</thought>
+<thought>Design decisions here</thought>
 
-**EXAMPLE RESPONSE (YOU MUST FOLLOW THIS STRUCTURE):**
+Step 2: After all thinking, write EXACTLY this line:
+<<<JSON_START>>>
+
+Step 3: Immediately output your JSON (no extra text, no markdown blocks):
+
+REQUIRED JSON STRUCTURE:
+{
+  "action": "create",
+  "globalTheme": {
+    "backgroundColor": "#FFFFFF",
+    "textColor": "#1A1A1A", 
+    "titleFont": "Arial",
+    "bodyFont": "Calibri",
+    "accentColor": "#3B82F6"
+  },
+  "slides": [
+    {
+      "layout": "title",
+      "title": "Your Title",
+      "subtitle": "Your Subtitle",
+      "content": [],
+      "design": {
+        "backgroundColor": "#FFFFFF",
+        "textColor": "#1A1A1A",
+        "titleFont": "Arial", 
+        "bodyFont": "Calibri",
+        "accentColor": "#3B82F6"
+      }
+    }
+  ]
+}
+
+RULES:
+- Each slide must have: layout, title, content (array), design
+- Layouts: "title", "content", "section", "twocolumn"
+- content is an array of strings (bullet points)
+- Use double quotes for all strings
+- No trailing commas
+- Apply globalTheme to all slides
+
+EXAMPLE OUTPUT:
+
 <thought>
-The user wants a 3-slide presentation about "Sustainable Energy".
-I’ll first define the layout and style.
+Creating a 3-slide presentation about AI:
+1. Title slide - "Introduction to AI"
+2. Content slide - "What is AI?"
+3. Content slide - "Applications"
 </thought>
-<action tool="webSearch">
-Searching for “latest trends in renewable energy 2025”.
-</action>
-<thought>
-Now I’ll synthesize the data and produce slides.
-</thought>
-${STREAM_SEPARATOR}
-{ "type": "done", "data": { ...your GeminiResponse JSON... } }
 
-Schema:
-${jsonSchema}
-`;
+<thought>
+Design: Clean white background, blue accents for tech theme, Arial/Calibri fonts for readability.
+</thought>
+
+<<<JSON_START>>>
+{"action":"create","globalTheme":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"},"slides":[{"layout":"title","title":"Introduction to AI","subtitle":"The Future of Technology","content":[],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"What is AI?","content":["Artificial intelligence simulates human intelligence","Includes machine learning and deep learning","Enables computers to learn from experience"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}}]}`;
 };
 
-// --- POST HANDLER ---
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -124,69 +219,100 @@ export async function POST(request: Request) {
     }
 
     const systemInstruction = getSystemInstruction(currentPPT);
-    const promptWithHistory = `${systemInstruction}\n\nUser: ${prompt}`;
+    const fullPrompt = `${systemInstruction}\n\n=== USER REQUEST ===\n${prompt}`;
 
-    // 1. Generate the streaming response from Gemini
+    console.log('🚀 Starting generation...');
+
     const result = await model.generateContentStream({
-      contents: [{ role: "user", parts: [{ text: promptWithHistory }] }],
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
       generationConfig,
       safetySettings,
     });
 
-    // 2. Wrap Google’s stream into a custom ReadableStream
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         let fullResponseText = "";
 
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
-          if (text) {
-            fullResponseText += text;
-            controller.enqueue(encoder.encode(text)); // stream reasoning to client
-          }
-        }
-
-        // 3. Extract JSON block and stream the final payload
-        const jsonMatch = fullResponseText.match(/```json\s*([\s\S]*?)\s*```/);
-
-        if (jsonMatch && jsonMatch[1]) {
-          try {
-            const parsedJson: GeminiResponse = JSON.parse(jsonMatch[1].trim());
-
-            // Apply globalTheme to slides without a design
-            if (parsedJson.globalTheme) {
-              parsedJson.slides = parsedJson.slides.map((slide) => ({
-                ...slide,
-                design: slide.design || parsedJson.globalTheme!,
-              }));
+        try {
+          // Collect all chunks
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (text) {
+              fullResponseText += text;
+              controller.enqueue(encoder.encode(text));
             }
-
-            const doneMessage = { type: "done", data: parsedJson };
-            controller.enqueue(
-              encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(doneMessage)}`)
-            );
-          } catch (err) {
-            console.error("❌ JSON parse error:", err);
-            controller.enqueue(
-              encoder.encode(
-                `${STREAM_SEPARATOR}${JSON.stringify({
-                  type: "error",
-                  error: "Failed to parse JSON output from Gemini.",
-                })}`
-              )
-            );
           }
-        } else {
-          console.error("❌ No JSON block found in AI response");
-          controller.enqueue(
-            encoder.encode(
-              `${STREAM_SEPARATOR}${JSON.stringify({
-                type: "error",
-                error: "No valid JSON data found in AI response.",
-              })}`
-            )
+
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('📦 RESPONSE LENGTH:', fullResponseText.length);
+          console.log('📝 LAST 500 CHARS:', fullResponseText.slice(-500));
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          // Extract JSON using multiple strategies
+          const jsonText = extractJSON(fullResponseText);
+
+          if (!jsonText) {
+            console.error('❌ FAILED TO EXTRACT JSON');
+            console.error('Full response:', fullResponseText);
+            const errorMsg = { 
+              type: "error", 
+              error: "Could not extract JSON from AI response. Please try again." 
+            };
+            controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(errorMsg)}`));
+            controller.close();
+            return;
+          }
+
+          console.log('✅ EXTRACTED JSON LENGTH:', jsonText.length);
+          console.log('📄 JSON PREVIEW:', jsonText.substring(0, 300));
+
+          // Parse the JSON
+          const parsedData: GeminiResponse = JSON.parse(jsonText);
+          
+          console.log('✅ JSON PARSED');
+          console.log('📊 SLIDES:', parsedData.slides?.length || 0);
+
+          // Apply global theme to slides if not present
+          if (parsedData.globalTheme) {
+            parsedData.slides = parsedData.slides.map(slide => ({
+              ...slide,
+              design: slide.design || parsedData.globalTheme!,
+              content: slide.content || [],
+            }));
+          }
+
+          // Validate slides
+          const validSlides = parsedData.slides.filter(slide => 
+            slide.title && 
+            slide.layout && 
+            slide.design && 
+            Array.isArray(slide.content)
           );
+
+          if (validSlides.length === 0) {
+            throw new Error('No valid slides in response');
+          }
+
+          parsedData.slides = validSlides;
+
+          console.log('✅ VALID SLIDES:', validSlides.length);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          // Send success response
+          const successMsg = { type: "done", data: parsedData };
+          controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(successMsg)}`));
+
+        } catch (error) {
+          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.error('❌ ERROR:', error);
+          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          
+          const errorMsg = { 
+            type: "error", 
+            error: error instanceof Error ? error.message : "Processing failed" 
+          };
+          controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(errorMsg)}`));
         }
 
         controller.close();
@@ -196,10 +322,10 @@ export async function POST(request: Request) {
     return new Response(stream, {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
+
   } catch (error) {
-    console.error("❌ Error in /api/gemini route:", error);
-    const message =
-      error instanceof Error ? error.message : "Internal server error";
+    console.error("❌ ROUTE ERROR:", error);
+    const message = error instanceof Error ? error.message : "Internal server error";
     return new Response(JSON.stringify({ error: message }), { status: 500 });
   }
 }

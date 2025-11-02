@@ -89,9 +89,9 @@ export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
         placeholder="Send a message to edit your slides..."
         // Set a max-height and make it scrollable beyond that
         className={cn(
-          'min-h-[40px] max-h-[200px] resize-none overflow-y-auto pr-16',
-          'bg-secondary text-secondary-foreground'
-        )}
+  'min-h-10 max-h-[200px] resize-none overflow-y-auto pr-16',
+  'bg-secondary text-secondary-foreground'
+)}
         rows={1}
         disabled={isLoading}
       />

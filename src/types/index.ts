@@ -1,29 +1,34 @@
 /**
  * Represents the structure of a single PowerPoint slide.
- * This is the master type used by the AI, the store, and the generator.
  */
 export type SlideDesign = {
-  backgroundColor: string; // e.g., "#FFFFFF"
-  textColor: string;       // e.g., "#333333"
-  titleFont: string;       // e.g., "Arial"
-  bodyFont: string;        // e.g., "Calibri"
-  accentColor: string;     // e.g., "#0078D4"
+  backgroundColor: string;
+  textColor: string;
+  titleFont: string;
+  bodyFont: string;
+  accentColor: string;
 };
 
 export type SlideContent = {
-  // Use a strict union for AI generation, but allow string for flexibility
   layout: 'title' | 'content' | 'section' | 'twocolumn' | string;
-  title: string;      // Title is required
-  subtitle?: string;  // Subtitle is optional (for title slides)
-  content: string[];  // Array of bullet points or paragraphs
+  title: string;
+  subtitle?: string;
+  content?: string[];
   design: SlideDesign;
+};
+
+export type ThinkingStep = {
+  type: 'thought' | 'action';
+  tool?: 'webSearch' | 'readWebsite';
+  content: string;
+  isStreaming?: boolean; // For live streaming indicator
 };
 
 /**
  * Represents the entire presentation data.
  */
 export type PPTData = {
-  title?: string; // Optional overall presentation title
+  title?: string;
   slides: SlideContent[];
   globalTheme?: SlideDesign;
 };
@@ -36,6 +41,7 @@ export type ChatMessage = {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
+  thinkingStep?: ThinkingStep; // NEW: Store thinking step data for styling
 };
 
 /**
@@ -54,7 +60,7 @@ export type GeminiResponse = {
 };
 
 /**
- * Represents the state of our chat application, managed by Zustand.
+ * Represents the state of our chat application.
  */
 export type ChatState = {
   messages: ChatMessage[];
