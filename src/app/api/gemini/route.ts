@@ -7,17 +7,18 @@ import {
 } from "@google/generative-ai";
 import { PPTData, GeminiResponse } from "@/types";
 
-// Initialize the Google SDK
+// --- Initialize the Google SDK ---
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
   throw new Error("GEMINI_API_KEY is not defined in environment variables.");
 }
+
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
-  model: 'gemini-2.5-pro-preview-05-06',
+  model: "gemini-2.5-pro-preview-05-06",
 });
 
-// Config
+// --- Config ---
 const generationConfig: GenerationConfig = {
   temperature: 0.7,
   topK: 40,
@@ -32,15 +33,18 @@ const safetySettings: SafetySetting[] = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-// System Prompt
+// --- THIS IS THE UNIQUE SEPARATOR (must match frontend) ---
+const STREAM_SEPARATOR = "\n[__DATA_SEPARATOR__]\n";
+
+// --- NEW SYSTEM PROMPT ---
 const getSystemInstruction = (currentPPT: PPTData | null): string => {
   const jsonSchema = `
   type SlideDesign = {
-    backgroundColor: string; // e.g., "#FFFFFF"
-    textColor: string;       // e.g., "#333333"
-    titleFont: string;       // e.g., "Arial", "Helvetica"
-    bodyFont: string;        // e.g., "Calibri", "Lato"
-    accentColor: string;     // e.g., "#0078D4" (for titles or highlights)
+    backgroundColor: string;
+    textColor: string;
+    titleFont: string;
+    bodyFont: string;
+    accentColor: string;
   };
 
   type SlideContent = {
@@ -48,17 +52,17 @@ const getSystemInstruction = (currentPPT: PPTData | null): string => {
     title: string;
     subtitle?: string;
     content: string[];
-    design?: SlideDesign; 
+    design?: SlideDesign;
   };
 
   type GeminiResponse = {
     action: 'create' | 'edit' | 'add' | 'delete' | 'reorder';
-    globalTheme?: SlideDesign; 
+    globalTheme?: SlideDesign;
     slides: SlideContent[];
     reasoning?: string;
   };
   `;
-  
+
   let contextInstruction: string;
   if (currentPPT) {
     contextInstruction = `The user wants to edit this presentation:
@@ -67,149 +71,135 @@ You MUST return the *complete, updated* presentation JSON.`;
   } else {
     contextInstruction = `The user wants a new presentation.`;
   }
-  
-  return `You are an expert AI presentation designer.
+
+  return `
+You are an expert AI presentation designer.
 Your task is to generate both the CONTENT and the DESIGN for a presentation.
 
 ${contextInstruction}
 
 **CRITICAL RESPONSE FORMAT:**
-1. **REASONING:** First, provide your "thought process" as plain text (2-3 sentences explaining your design choices).
-2. **JSON DATA:** After your reasoning, you MUST output a SINGLE valid JSON code block using this EXACT format:
+You MUST respond in two parts:
+1.  **STRUCTURED REASONING LOG:** Stream your thought process as XML-like tags.
+    - For thinking: <thought>Your reasoning here...</thought>
+    - For actions: <action tool="webSearch">Searching for...</action>
+    - For reading: <action tool="readWebsite">Reading example.com...</action>
 
-\`\`\`json
-{
-  "action": "create",
-  "globalTheme": {
-    "backgroundColor": "#FFFFFF",
-    "textColor": "#2C3E50",
-    "titleFont": "Arial",
-    "bodyFont": "Calibri",
-    "accentColor": "#3498DB"
-  },
-  "slides": [
-    {
-      "layout": "title",
-      "title": "Your Title",
-      "subtitle": "Optional Subtitle",
-      "content": []
-    }
-  ],
-  "reasoning": "Brief explanation of design choices"
-}
-\`\`\`
+2.  **FINAL JSON DATA:** After your *entire* reasoning log, output this separator and JSON:
+${STREAM_SEPARATOR}
+{ "type": "done", "data": { ...your GeminiResponse JSON... } }
 
-**IMPORTANT RULES:**
-- The JSON block MUST be wrapped in \`\`\`json ... \`\`\`
-- Do NOT include the reasoning text inside the JSON
-- Always provide a globalTheme with ALL five properties
-- Each slide should have: layout, title, content array
-- Content array contains bullet points as strings
-- Choose professional color schemes that work well together
-- Use appropriate fonts (Arial, Helvetica, Calibri, Lato, etc.)
+**EXAMPLE RESPONSE (YOU MUST FOLLOW THIS STRUCTURE):**
+<thought>
+The user wants a 3-slide presentation about "Sustainable Energy".
+I’ll first define the layout and style.
+</thought>
+<action tool="webSearch">
+Searching for “latest trends in renewable energy 2025”.
+</action>
+<thought>
+Now I’ll synthesize the data and produce slides.
+</thought>
+${STREAM_SEPARATOR}
+{ "type": "done", "data": { ...your GeminiResponse JSON... } }
 
-Schema: ${jsonSchema}`;
+Schema:
+${jsonSchema}
+`;
 };
 
-// Unique separator
-const STREAM_SEPARATOR = "\n[__DATA_SEPARATOR__]\n";
-
-// POST Handler
+// --- POST HANDLER ---
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { prompt, currentPPT } = body as { 
-      prompt: string; 
-      currentPPT: PPTData | null; 
+    const { prompt, currentPPT } = body as {
+      prompt: string;
+      currentPPT: PPTData | null;
     };
 
     if (!prompt) {
-      return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Prompt is required" }), {
+        status: 400,
+      });
     }
 
     const systemInstruction = getSystemInstruction(currentPPT);
     const promptWithHistory = `${systemInstruction}\n\nUser: ${prompt}`;
 
-    // Get the streaming result from the Google SDK
+    // 1. Generate the streaming response from Gemini
     const result = await model.generateContentStream({
-      contents: [{ role: 'user', parts: [{ text: promptWithHistory }] }],
+      contents: [{ role: "user", parts: [{ text: promptWithHistory }] }],
       generationConfig,
       safetySettings,
     });
 
-    // Create our own ReadableStream
+    // 2. Wrap Google’s stream into a custom ReadableStream
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         let fullResponseText = "";
 
-        // Iterate over the stream from Google
         for await (const chunk of result.stream) {
-          try {
-            const text = chunk.text();
-            if (text) {
-              fullResponseText += text;
-              // Send the raw text chunk to the client
-              controller.enqueue(encoder.encode(text));
-            }
-          } catch (e) {
-            console.error("Error processing stream chunk:", e);
+          const text = chunk.text();
+          if (text) {
+            fullResponseText += text;
+            controller.enqueue(encoder.encode(text)); // stream reasoning to client
           }
         }
 
-        // Once the stream is done, parse the JSON
-        // Look for JSON block with flexible regex
-        const jsonBlock = fullResponseText.match(/```json\s*([\s\S]*?)\s*```/);
-        
-        if (jsonBlock && jsonBlock[1]) {
+        // 3. Extract JSON block and stream the final payload
+        const jsonMatch = fullResponseText.match(/```json\s*([\s\S]*?)\s*```/);
+
+        if (jsonMatch && jsonMatch[1]) {
           try {
-            const parsedJson: GeminiResponse = JSON.parse(jsonBlock[1].trim());
-            
-            // Apply globalTheme to slides that don't have their own design
+            const parsedJson: GeminiResponse = JSON.parse(jsonMatch[1].trim());
+
+            // Apply globalTheme to slides without a design
             if (parsedJson.globalTheme) {
-              parsedJson.slides = parsedJson.slides.map(slide => ({
+              parsedJson.slides = parsedJson.slides.map((slide) => ({
                 ...slide,
                 design: slide.design || parsedJson.globalTheme!,
               }));
             }
-            
-            // Send a special "DONE" message with the final JSON payload
-            const doneMessage = {
-              type: 'done',
-              data: parsedJson,
-            };
-            controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(doneMessage)}`));
 
-          } catch (e) {
-            console.error('Failed to parse final JSON:', e);
-            console.error('JSON string was:', jsonBlock[1]);
-            controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify({ 
-              type: 'error',
-              error: "Failed to parse AI response. Please try again." 
-            })}`));
+            const doneMessage = { type: "done", data: parsedJson };
+            controller.enqueue(
+              encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(doneMessage)}`)
+            );
+          } catch (err) {
+            console.error("❌ JSON parse error:", err);
+            controller.enqueue(
+              encoder.encode(
+                `${STREAM_SEPARATOR}${JSON.stringify({
+                  type: "error",
+                  error: "Failed to parse JSON output from Gemini.",
+                })}`
+              )
+            );
           }
         } else {
-          console.error('No JSON block found in final response.');
-          console.error('Full response was:', fullResponseText);
-          controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify({ 
-            type: 'error',
-            error: "No valid JSON data found in AI response. Please try again." 
-          })}`));
+          console.error("❌ No JSON block found in AI response");
+          controller.enqueue(
+            encoder.encode(
+              `${STREAM_SEPARATOR}${JSON.stringify({
+                type: "error",
+                error: "No valid JSON data found in AI response.",
+              })}`
+            )
+          );
         }
 
-        // Close the stream
         controller.close();
       },
     });
 
-    // Return the stream
     return new Response(stream, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
-
   } catch (error) {
-    console.error('Error in /api/gemini route:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
+    console.error("❌ Error in /api/gemini route:", error);
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
     return new Response(JSON.stringify({ error: message }), { status: 500 });
   }
 }

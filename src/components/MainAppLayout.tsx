@@ -53,7 +53,7 @@ export function MainAppLayout() {
           >
             {/* Column 1: Chat Interface */}
             <div className="flex flex-col h-full w-full flex-1 border-r max-w-2xl overflow-hidden">
-              <header className="flex-shrink-0 flex items-center justify-between p-4 border-b bg-background">
+              <header className="shrink-0 flex items-center justify-between p-4 border-b bg-background">
                 <h1 className="text-xl font-semibold">AI PPT Chat</h1>
                 <Button 
                   variant="outline" 
@@ -71,7 +71,7 @@ export function MainAppLayout() {
 
             {/* Column 2: PPT Preview */}
             <div className="flex flex-col h-full flex-1 overflow-hidden">
-              <header className="flex-shrink-0 flex items-center justify-between p-4 border-b bg-background">
+              <header className="shrink-0 flex items-center justify-between p-4 border-b bg-background">
                 <h2 className="text-xl font-semibold">Preview</h2>
                 <DownloadButton />
               </header>
