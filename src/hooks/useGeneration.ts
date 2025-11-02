@@ -1,4 +1,3 @@
-// hooks/useGeneration.ts
 import { useChatStore } from '@/store/useChatStore';
 import { toast } from 'sonner';
 import { ChatMessage, ThinkingStep } from '@/types';
@@ -30,7 +29,7 @@ function extractThoughtSteps(text: string): ThinkingStep[] {
   const lastThoughtStart = text.lastIndexOf('<thought>');
   const lastThoughtEnd = text.lastIndexOf('</thought>');
   
-  if (lastThoughtStart > lastThoughtEnd) {
+  if (lastThoughtStart > lastThoughtEnd && lastThoughtStart !== -1) {
     const streamingContent = text.substring(lastThoughtStart + 9).trim();
     if (streamingContent && streamingContent.length > 0) {
       steps.push({
@@ -98,7 +97,6 @@ export function useGeneration() {
 
       console.log('🔄 Starting stream...');
 
-      // Stream processing
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -107,37 +105,53 @@ export function useGeneration() {
         accumulatedText += chunk;
 
         // Check if JSON part has started
-        if (accumulatedText.includes(STREAM_SEPARATOR)) {
-          if (!jsonStarted) {
-            jsonStarted = true;
-            console.log('🔍 JSON separator found');
-            
-            // Extract only the thinking part (before separator)
-            const thinkingPart = accumulatedText.split(STREAM_SEPARATOR)[0];
-            finalThinkingSteps = extractThoughtSteps(thinkingPart);
-          }
+        if (accumulatedText.includes(STREAM_SEPARATOR) && !jsonStarted) {
+          jsonStarted = true;
+          console.log('📍 JSON separator found');
+          
+          // Extract thinking part (before separator)
+          const thinkingPart = accumulatedText.split(STREAM_SEPARATOR)[0];
+          finalThinkingSteps = extractThoughtSteps(thinkingPart);
         }
       }
 
       console.log('✅ Stream complete');
 
+      // If no separator found, check if we have thinking tags anyway
+      if (!jsonStarted && accumulatedText.includes('<thought>')) {
+        console.log('⚠️ Found thinking tags but no separator, extracting anyway...');
+        const lastThoughtEnd = accumulatedText.lastIndexOf('</thought>');
+        if (lastThoughtEnd !== -1) {
+          const thinkingPart = accumulatedText.substring(0, lastThoughtEnd + 10);
+          finalThinkingSteps = extractThoughtSteps(thinkingPart);
+        }
+      }
+
       // Convert thinking steps to permanent messages
-      const thinkingMessages = convertStepsToMessages(finalThinkingSteps);
-      thinkingMessages.forEach(msg => addMessage(msg));
+      if (finalThinkingSteps.length > 0) {
+        const thinkingMessages = convertStepsToMessages(finalThinkingSteps);
+        thinkingMessages.forEach(msg => addMessage(msg));
+      }
 
       // Extract and parse JSON
-      if (!accumulatedText.includes(STREAM_SEPARATOR)) {
-        throw new Error("Invalid response format - no JSON separator found");
+      let jsonText = "";
+      
+      if (accumulatedText.includes(STREAM_SEPARATOR)) {
+        const parts = accumulatedText.split(STREAM_SEPARATOR);
+        jsonText = parts[parts.length - 1]?.trim();
+      } else {
+        // Try to find JSON without separator
+        const jsonMatch = accumulatedText.match(/\{[\s\S]*"type"\s*:\s*"done"[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonText = jsonMatch[0];
+        }
       }
-
-      const parts = accumulatedText.split(STREAM_SEPARATOR);
-      const jsonText = parts[parts.length - 1]?.trim();
 
       if (!jsonText) {
-        throw new Error("No JSON data received");
+        throw new Error("No JSON data found in response");
       }
 
-      console.log('📦 Parsing JSON...');
+      console.log('📦 Parsing JSON, length:', jsonText.length);
       const doneData = JSON.parse(jsonText);
       
       if (doneData.type === 'done' && doneData.data) {

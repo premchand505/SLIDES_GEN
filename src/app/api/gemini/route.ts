@@ -18,10 +18,11 @@ const model = genAI.getGenerativeModel({
 });
 
 const generationConfig: GenerationConfig = {
-  temperature: 0.8,
+  temperature: 0.7,
   topK: 40,
   topP: 0.95,
   maxOutputTokens: 8192,
+  responseMimeType: "application/json", // Force JSON mode
 };
 
 const safetySettings: SafetySetting[] = [
@@ -31,249 +32,137 @@ const safetySettings: SafetySetting[] = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-const STREAM_SEPARATOR = "\n<<<JSON_START>>>\n";
-
-function extractJSON(text: string): string | null {
-  console.log('🔍 Attempting to extract JSON from text...');
-  
-  // Method 1: Look for our custom separator
-  const separators = ['<<<JSON_START>>>', '<<<json_start>>>', 'JSON_START', 'json_start'];
-  for (const sep of separators) {
-    if (text.includes(sep)) {
-      console.log('✅ Found separator:', sep);
-      const parts = text.split(sep);
-      let jsonPart = parts[parts.length - 1].trim();
-      
-      // Clean markdown if present
-      jsonPart = jsonPart.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-      
-      if (jsonPart && jsonPart.startsWith('{')) {
-        return jsonPart;
-      }
-    }
-  }
-  
-  console.log('⚠️ No separator found, trying regex patterns...');
-  
-  // Method 2: Look for JSON object pattern starting with action/slides
-  const patterns = [
-    /\{[\s\S]*?"action"[\s\S]*?"slides"[\s\S]*?\}(?:\}(?:\})?)*/,
-    /\{[\s\S]*?"slides"[\s\S]*?"action"[\s\S]*?\}(?:\}(?:\})?)*/,
-    /\{[\s\S]*?"globalTheme"[\s\S]*?"slides"[\s\S]*?\}(?:\}(?:\})?)*/,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      console.log('✅ Found JSON via regex');
-      let jsonStr = match[0];
-      
-      // Clean markdown
-      jsonStr = jsonStr.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-      
-      // Balance braces
-      let braceCount = 0;
-      let endIdx = -1;
-      for (let i = 0; i < jsonStr.length; i++) {
-        if (jsonStr[i] === '{') braceCount++;
-        if (jsonStr[i] === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            endIdx = i + 1;
-            break;
-          }
-        }
-      }
-      
-      if (endIdx > 0) {
-        return jsonStr.substring(0, endIdx);
-      }
-    }
-  }
-  
-  console.log('⚠️ Regex failed, trying last resort...');
-  
-  // Method 3: Find last complete JSON object in text
-  const lastOpenBrace = text.lastIndexOf('{');
-  if (lastOpenBrace !== -1) {
-    const testText = text.substring(lastOpenBrace);
-    
-    // Try to find complete object
-    let braceCount = 0;
-    let endIdx = -1;
-    for (let i = 0; i < testText.length; i++) {
-      if (testText[i] === '{') braceCount++;
-      if (testText[i] === '}') {
-        braceCount--;
-        if (braceCount === 0) {
-          endIdx = i + 1;
-          break;
-        }
-      }
-    }
-    
-    if (endIdx > 0) {
-      const jsonCandidate = testText.substring(0, endIdx);
-      // Check if it looks like our data structure
-      if (jsonCandidate.includes('slides') || jsonCandidate.includes('action')) {
-        console.log('✅ Found JSON by brace matching');
-        return jsonCandidate;
-      }
-    }
-  }
-  
-  console.error('❌ All extraction methods failed');
-  return null;
-}
-
 const getSystemInstruction = (currentPPT: PPTData | null): string => {
   let contextInstruction: string;
   if (currentPPT) {
-    contextInstruction = `EXISTING PRESENTATION TO EDIT:
+    contextInstruction = `Edit this existing presentation:
 ${JSON.stringify(currentPPT, null, 2)}
 
-You must return the COMPLETE updated presentation with ALL slides.`;
+Return the COMPLETE updated presentation with ALL slides.`;
   } else {
     contextInstruction = `Create a NEW presentation from scratch.`;
   }
 
-  return `You are an expert AI presentation designer with research capabilities.
-
-CRITICAL: You MUST output valid JSON at the end. This is non-negotiable.
-
-Create comprehensive, well-researched slide decks.
+  return `You are an expert AI presentation designer.
 
 ${contextInstruction}
 
-RESPONSE FORMAT - FOLLOW THIS STRUCTURE:
+You must return a JSON object with this EXACT structure:
 
-Step 1: RESEARCH PHASE - Show your research process using specific action tags:
-
-<thought>Initial planning and defining scope</thought>
-
-<action tool="webSearch">
-Search query about the topic
-</action>
-
-<thought>Analyzing search results and selecting sources</thought>
-
-<action tool="readWebsite">
-https://www.example.com/article-url
-</action>
-
-<thought>Synthesizing information from the source</thought>
-
-Continue this pattern - search multiple sources, read websites, analyze information.
-IMPORTANT: 
-- Use <thought> tags for your reasoning (no asterisks, clean prose)
-- Use <action tool="webSearch"> when you need to search for information
-- Use <action tool="readWebsite"> when you want to read a specific URL
-- Provide 4-8 thinking steps minimum, showing thorough research
-- Each <thought> should be substantial (2-4 sentences minimum)
-- Show your process: define scope → search → analyze → synthesize → design
-
-Step 2: After all research and thinking, write EXACTLY:
-<<<JSON_START>>>
-
-Step 3: Output the JSON for the presentation (no markdown blocks):
-
-REQUIRED JSON STRUCTURE:
 {
-  "action": "create",
-  "globalTheme": {
-    "backgroundColor": "#FFFFFF",
-    "textColor": "#1A1A1A",
-    "titleFont": "Arial",
-    "bodyFont": "Calibri",
-    "accentColor": "#3B82F6"
-  },
-  "slides": [
-    {
-      "layout": "title",
-      "title": "Your Title",
-      "subtitle": "Your Subtitle", 
-      "content": [],
-      "design": {...}
+  "thinking": [
+    "First major planning step: explain what you're planning and why",
+    "Second thinking step: what content structure makes sense",
+    "Third step: design decisions and color choices",
+    "Fourth step: how you'll organize the information",
+    "Fifth step: final synthesis and approach"
+  ],
+  "presentation": {
+    "action": "create",
+    "globalTheme": {
+      "backgroundColor": "#FFFFFF",
+      "textColor": "#1A1A1A",
+      "titleFont": "Arial",
+      "bodyFont": "Calibri",
+      "accentColor": "#3B82F6"
     },
-    {
-      "layout": "content",
-      "title": "Slide Title",
-      "content": ["Point 1", "Point 2", "Point 3"],
-      "design": {...}
-    }
-  ]
+    "slides": [
+      {
+        "layout": "title",
+        "title": "Main Title",
+        "subtitle": "Subtitle text",
+        "content": [],
+        "design": {
+          "backgroundColor": "#FFFFFF",
+          "textColor": "#1A1A1A",
+          "titleFont": "Arial",
+          "bodyFont": "Calibri",
+          "accentColor": "#3B82F6"
+        }
+      },
+      {
+        "layout": "content",
+        "title": "Slide Title",
+        "content": [
+          "First point with detailed information",
+          "Second point explaining key concepts",
+          "Third point with supporting details"
+        ],
+        "design": {
+          "backgroundColor": "#FFFFFF",
+          "textColor": "#1A1A1A",
+          "titleFont": "Arial",
+          "bodyFont": "Calibri",
+          "accentColor": "#3B82F6"
+        }
+      }
+    ]
+  }
 }
 
-EXAMPLE COMPLETE RESPONSE:
-
-<thought>
-Defining the Scope
-
-The user wants a presentation about Artificial Intelligence. I need to cover the fundamentals, applications, benefits, challenges, and future outlook. My goal is to create an informative yet accessible presentation suitable for a general audience. I'll need to research current definitions, real-world applications, and expert perspectives on AI's trajectory.
-</thought>
-
-<action tool="webSearch">
-What is Artificial Intelligence definition types
-</action>
-
-<thought>
-Researching Foundational Concepts
-
-I've found several authoritative sources on AI. I'll focus on gathering information from academic and industry-standard definitions to ensure accuracy. The search results include IBM's AI overview, Stanford's AI research, and Wikipedia's comprehensive article. Let me read the IBM source first for a business-oriented perspective.
-</thought>
-
-<action tool="readWebsite">
-https://www.ibm.com/topics/artificial-intelligence
-</action>
-
-<thought>
-Analyzing IBM's Perspective
-
-The IBM article provides a solid foundation covering AI definition, machine learning, deep learning, and neural networks. It emphasizes AI's practical business applications. Now I need to gather information about real-world applications across different industries to make the presentation more concrete and relatable.
-</thought>
-
-<action tool="webSearch">
-AI applications in healthcare finance education 2024
-</action>
-
-<thought>
-Exploring Industry Applications
-
-The search reveals fascinating use cases: AI in medical diagnostics, personalized learning platforms, fraud detection in banking, and autonomous vehicles. These examples will make excellent content for demonstrating AI's real-world impact. I should also research the challenges and ethical considerations to provide a balanced view.
-</thought>
-
-<action tool="webSearch">
-AI challenges ethics concerns bias
-</action>
-
-<thought>
-Understanding Challenges and Ethics
-
-I've gathered information about AI bias, privacy concerns, job displacement fears, and the need for regulation. This is crucial for a complete presentation. Now I have enough information to structure a comprehensive 6-slide presentation covering: introduction, definition, applications, benefits, challenges, and future outlook.
-</thought>
-
-<thought>
-Designing the Presentation
-
-For the design, I'll use a modern, tech-forward aesthetic with a clean white background and blue accent color to convey trust and innovation. Arial for titles provides clarity, while Calibri for body text ensures readability. The presentation will flow logically from concepts to applications to implications, making it engaging and informative.
-</thought>
-
-<<<JSON_START>>>
-{"action":"create","globalTheme":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"},"slides":[{"layout":"title","title":"Artificial Intelligence","subtitle":"Transforming Our World Through Intelligent Systems","content":[],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"What is AI?","content":["Simulation of human intelligence processes by machines and computer systems","Encompasses machine learning, deep learning, neural networks, and natural language processing","Systems that can learn from experience, adjust to new inputs, and perform human-like tasks","Enables computers to process vast amounts of data and identify patterns beyond human capability"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"Real-World Applications","content":["Healthcare: AI-powered diagnostics, drug discovery, and personalized treatment plans","Finance: Fraud detection, algorithmic trading, and risk assessment","Education: Adaptive learning platforms and intelligent tutoring systems","Transportation: Autonomous vehicles and traffic optimization","Customer Service: Chatbots and virtual assistants providing 24/7 support"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"Benefits of AI","content":["Automation of repetitive tasks increases efficiency and productivity","Enhanced decision-making through data-driven insights and predictions","24/7 availability without human limitations like fatigue","Ability to process and analyze massive datasets in real-time","Cost reduction through optimized operations and resource allocation"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"Challenges & Considerations","content":["Algorithmic bias and fairness concerns in AI decision-making","Privacy issues related to data collection and usage","Potential job displacement and workforce transformation","Need for transparency and explainability in AI systems","Ethical frameworks and regulatory oversight requirements"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}},{"layout":"content","title":"The Future of AI","content":["Continued advancement in natural language understanding and generation","Integration of AI across all industries and daily life","Development of more ethical and transparent AI systems","Collaboration between humans and AI to augment capabilities","Focus on AI safety, alignment, and beneficial outcomes for humanity"],"design":{"backgroundColor":"#FFFFFF","textColor":"#1A1A1A","titleFont":"Arial","bodyFont":"Calibri","accentColor":"#3B82F6"}}]}
-
 CRITICAL RULES:
-- Minimum 4-8 <thought> blocks showing detailed research process
-- Use <action> tags for web searches and website reading
-- Each thought should be 2-4 sentences, no bullet points, no asterisks
-- Make thoughts substantial and informative
-- After research, you MUST output <<<JSON_START>>> on its own line
-- Then immediately output ONLY the JSON object with no extra text
-- The JSON must be valid and parseable
-- Do not wrap JSON in markdown code blocks
-- Do not add any text after the JSON
-- Create 5-8 slides minimum for comprehensive coverage
+- thinking array must have 4-8 strings showing your planning process
+- Each thinking string should be 2-4 sentences explaining your approach
+- Valid layouts: "title", "content", "section", "twocolumn"
+- Each slide MUST have: layout, title, content (array), design (object)
+- content must be an array of strings (can be empty for title slides)
+- Choose professional color schemes with good contrast
+- Create 4-6 slides minimum for comprehensive coverage
 
-MANDATORY: The response must end with valid JSON after <<<JSON_START>>>. If you do not include the JSON, the system will fail.`;
+EXAMPLE for "Artificial Intelligence" topic:
+
+{
+  "thinking": [
+    "Planning Structure: I'll create a 6-slide presentation about AI covering fundamentals, applications, benefits, challenges, ethics, and future outlook. This provides a comprehensive overview suitable for general audiences.",
+    "Content Strategy: Each slide will focus on one key aspect. The title slide introduces the topic, followed by definition slides with clear explanations, practical applications to show real-world impact, and concluding with forward-looking perspectives.",
+    "Design Approach: I'll use a modern tech aesthetic with blue accent color to convey trust and innovation. White backgrounds ensure readability with dark gray text for strong contrast. Arial for titles provides clarity while Calibri ensures comfortable reading.",
+    "Information Flow: The presentation will progress logically from concepts to applications to implications, making it both educational and engaging for viewers unfamiliar with the subject."
+  ],
+  "presentation": {
+    "action": "create",
+    "globalTheme": {
+      "backgroundColor": "#FFFFFF",
+      "textColor": "#2C3E50",
+      "titleFont": "Arial",
+      "bodyFont": "Calibri",
+      "accentColor": "#3498DB"
+    },
+    "slides": [
+      {
+        "layout": "title",
+        "title": "Artificial Intelligence",
+        "subtitle": "Transforming How We Live and Work",
+        "content": [],
+        "design": {
+          "backgroundColor": "#FFFFFF",
+          "textColor": "#2C3E50",
+          "titleFont": "Arial",
+          "bodyFont": "Calibri",
+          "accentColor": "#3498DB"
+        }
+      },
+      {
+        "layout": "content",
+        "title": "What is AI?",
+        "content": [
+          "Computer systems that can perform tasks requiring human intelligence",
+          "Includes machine learning, deep learning, and neural networks",
+          "Enables computers to learn from data and improve over time",
+          "Powers applications from voice assistants to autonomous vehicles"
+        ],
+        "design": {
+          "backgroundColor": "#FFFFFF",
+          "textColor": "#2C3E50",
+          "titleFont": "Arial",
+          "bodyFont": "Calibri",
+          "accentColor": "#3498DB"
+        }
+      }
+    ]
+  }
+}
+
+Return ONLY valid JSON matching this structure.`;
 };
 
 export async function POST(request: Request) {
@@ -291,9 +180,9 @@ export async function POST(request: Request) {
     }
 
     const systemInstruction = getSystemInstruction(currentPPT);
-    const fullPrompt = `${systemInstruction}\n\n=== USER REQUEST ===\n${prompt}\n\nRemember: Show your research process with multiple <thought> and <action> tags before generating the presentation JSON.`;
+    const fullPrompt = `${systemInstruction}\n\nUser Request: ${prompt}\n\nGenerate the presentation about: ${prompt}`;
 
-    console.log('🚀 Starting generation with research...');
+    console.log('🚀 Starting generation in JSON mode...');
 
     const result = await model.generateContentStream({
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
@@ -305,6 +194,7 @@ export async function POST(request: Request) {
       async start(controller) {
         const encoder = new TextEncoder();
         let fullResponseText = "";
+        let thinkingStepsSent = false;
 
         try {
           // Collect all chunks
@@ -312,49 +202,50 @@ export async function POST(request: Request) {
             const text = chunk.text();
             if (text) {
               fullResponseText += text;
-              controller.enqueue(encoder.encode(text));
+              
+              // Try to parse incrementally for thinking steps
+              if (!thinkingStepsSent) {
+                try {
+                  const partial = JSON.parse(fullResponseText);
+                  if (partial.thinking && Array.isArray(partial.thinking)) {
+                    // Send thinking steps as they come
+                    for (const thought of partial.thinking) {
+                      const thinkingMsg = `<thought>${thought}</thought>\n`;
+                      controller.enqueue(encoder.encode(thinkingMsg));
+                    }
+                    thinkingStepsSent = true;
+                  }
+                } catch {
+                  // Not complete yet, continue
+                }
+              }
             }
           }
 
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('📦 RESPONSE LENGTH:', fullResponseText.length);
-          console.log('📝 FULL RESPONSE:');
-          console.log(fullResponseText);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('✅ Stream complete, length:', fullResponseText.length);
 
-          // Extract JSON using multiple strategies
-          const jsonText = extractJSON(fullResponseText);
-
-          if (!jsonText) {
-            console.error('❌ FAILED TO EXTRACT JSON');
-            const errorMsg = { 
-              type: "error", 
-              error: "Could not extract JSON from AI response. Please try again." 
-            };
-            controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(errorMsg)}`));
-            controller.close();
-            return;
+          // Parse the complete response
+          const responseData = JSON.parse(fullResponseText);
+          
+          if (!responseData.presentation) {
+            throw new Error('Invalid response structure - missing presentation');
           }
 
-          console.log('✅ EXTRACTED JSON LENGTH:', jsonText.length);
+          const presentation: GeminiResponse = responseData.presentation;
 
-          // Parse the JSON
-          const parsedData: GeminiResponse = JSON.parse(jsonText);
-          
-          console.log('✅ JSON PARSED');
-          console.log('📊 SLIDES:', parsedData.slides?.length || 0);
+          console.log('✅ JSON parsed, slides:', presentation.slides?.length || 0);
 
-          // Apply global theme to slides if not present
-          if (parsedData.globalTheme) {
-            parsedData.slides = parsedData.slides.map(slide => ({
+          // Apply global theme
+          if (presentation.globalTheme) {
+            presentation.slides = presentation.slides.map(slide => ({
               ...slide,
-              design: slide.design || parsedData.globalTheme!,
+              design: slide.design || presentation.globalTheme!,
               content: slide.content || [],
             }));
           }
 
           // Validate slides
-          const validSlides = parsedData.slides.filter(slide => 
+          const validSlides = presentation.slides.filter(slide => 
             slide.title && 
             slide.layout && 
             slide.design && 
@@ -365,25 +256,23 @@ export async function POST(request: Request) {
             throw new Error('No valid slides in response');
           }
 
-          parsedData.slides = validSlides;
+          presentation.slides = validSlides;
 
-          console.log('✅ VALID SLIDES:', validSlides.length);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('✅ Valid slides:', validSlides.length);
 
-          // Send success response
-          const successMsg = { type: "done", data: parsedData };
-          controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(successMsg)}`));
+          // Send success response with separator
+          const successMsg = { type: "done", data: presentation };
+          controller.enqueue(encoder.encode(`\n<<<JSON_START>>>\n${JSON.stringify(successMsg)}`));
 
         } catch (error) {
-          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.error('❌ ERROR:', error);
-          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.error('❌ Processing error:', error);
+          console.error('Response text:', fullResponseText.substring(0, 500));
           
           const errorMsg = { 
             type: "error", 
             error: error instanceof Error ? error.message : "Processing failed" 
           };
-          controller.enqueue(encoder.encode(`${STREAM_SEPARATOR}${JSON.stringify(errorMsg)}`));
+          controller.enqueue(encoder.encode(`\n<<<JSON_START>>>\n${JSON.stringify(errorMsg)}`));
         }
 
         controller.close();
@@ -395,7 +284,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error("❌ ROUTE ERROR:", error);
+    console.error("❌ Route error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
     return new Response(JSON.stringify({ error: message }), { status: 500 });
   }
