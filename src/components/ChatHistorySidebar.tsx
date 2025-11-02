@@ -11,7 +11,7 @@ export function ChatHistorySidebar() {
   const { sessions, currentSessionId, loadSession, deleteSession, createNewSession } = useChatStore();
 
   return (
-    <div className="w-64 border-r bg-muted/30 flex flex-col h-full">
+    <div className="w-64 border-r bg-white flex flex-col h-full">
       <div className="p-4 border-b">
         <Button 
           onClick={createNewSession}
@@ -26,7 +26,7 @@ export function ChatHistorySidebar() {
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
           {sessions.length === 0 ? (
-            <div className="text-center text-sm text-muted-foreground p-4">
+            <div className="text-center text-sm text-white p-4">
               No chat history yet
             </div>
           ) : (
@@ -34,17 +34,17 @@ export function ChatHistorySidebar() {
               <div
                 key={session.id}
                 className={cn(
-                  "group relative flex items-center gap-2 rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors",
-                  currentSessionId === session.id && "bg-muted"
+                  "group relative flex items-center gap-2 rounded-lg p-3 cursor-pointer bg-white transition-colors",
+                  currentSessionId === session.id && "bg-white"
                 )}
                 onClick={() => loadSession(session.id)}
               >
-                <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <MessageSquare className="h-4 w-4 shrink-0 text-black" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">
                     {session.title}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-black">
                     {format(new Date(session.updatedAt), 'MMM d, h:mm a')}
                   </div>
                 </div>

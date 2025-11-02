@@ -9,9 +9,6 @@ function cleanText(text: string | undefined): string {
   return text.replace(/\*\*/g, '').replace(/\*/g, '');
 }
 
-// --------------------------
-// ✅ FIXED: Type-safe layout normalization
-// --------------------------
 function normalizeLayout(rawLayout: SlideLayout | undefined): SlideLayout {
   if (!rawLayout) return 'content';
   

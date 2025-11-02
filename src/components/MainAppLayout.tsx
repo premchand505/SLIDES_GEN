@@ -1,7 +1,6 @@
-// components/MainAppLayout.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ChatInterface } from '@/components/ChatInterface';
 import { PPTPreview } from '@/components/PPTPreview';
 import { InitialPrompt } from '@/components/InitialPrompt';
@@ -9,9 +8,10 @@ import { useChatStore } from '@/store/useChatStore';
 import { AnimatePresence, motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { Plus, Home } from 'lucide-react';
+import { Plus, Home, Presentation, X } from 'lucide-react';
 import { AppShell } from '@/components/Appshell';
-import { useGeneration } from  '@/hooks/useGeneration';
+import { useGeneration } from '@/hooks/useGeneration';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 const DownloadButton = dynamic(
   () => import('@/components/DownloadButton').then(mod => mod.DownloadButton),
@@ -27,54 +27,51 @@ export function MainAppLayout() {
     isLoading,
   } = useChatStore();
 
-  // ✅ Use the shared generation hook
   const { handleGenerate } = useGeneration();
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   const hasData = (pptData?.slides?.length ?? 0) > 0;
   const hasMessages = messages.length > 0;
 
-  // Create a session on first mount if none exists
   useEffect(() => {
     if (!currentSessionId && !isLoading) {
       createNewSession();
     }
   }, [currentSessionId, createNewSession, isLoading]);
 
-  // ✅ FIXED: Now properly triggers generation
   const handleFirstSubmit = (topic: string) => {
     const trimmed = topic.trim();
     if (!trimmed || isLoading) return;
 
-    // Ensure session exists
     const store = useChatStore.getState();
     let sessionId = store.currentSessionId;
     if (!sessionId) {
       sessionId = store.createNewSession();
     }
 
-    // Trigger the actual generation
     handleGenerate(trimmed);
   };
 
   const handleNewChat = () => {
+    setMobilePreviewOpen(false);
     createNewSession();
   };
 
   return (
     <AppShell>
       <AnimatePresence mode="wait">
-        {/* ----- Initial Prompt (no messages) ----- */}
+        {/* ===== INITIAL PROMPT (No messages) ===== */}
         {!hasMessages ? (
           <motion.div
             key="initial"
-            className="h-full w-full flex items-center justify-center"
+            className="h-full w-full flex items-center justify-center p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <InitialPrompt onSubmit={handleFirstSubmit} isLoading={isLoading} />
           </motion.div>
-        ) : /* ----- Chat only (no PPT yet) ----- */
+        ) : /* ===== CHAT ONLY (No slides yet) ===== */
         !hasData ? (
           <motion.div
             key="chat-only"
@@ -83,10 +80,10 @@ export function MainAppLayout() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <header className="shrink-0 flex items-center justify-between p-4 border-b bg-background">
-              <h2 className="text-lg font-medium">Chat</h2>
+            <header className="shrink-0 flex items-center justify-between p-3 md:p-4 border-b bg-background">
+              <h2 className="text-base md:text-lg font-medium">Chat</h2>
               <Button variant="outline" size="sm" onClick={handleNewChat}>
-                <Home className="h-4 w-4 mr-2 md:hidden" />
+                <Home className="h-4 w-4 md:mr-2" />
                 <span className="hidden md:inline">New Chat</span>
               </Button>
             </header>
@@ -95,7 +92,8 @@ export function MainAppLayout() {
             </div>
           </motion.div>
         ) : (
-          /* ----- Chat + Preview ----- */
+          /* ===== DESKTOP: Chat + Preview Side-by-Side ===== */
+          /* ===== MOBILE: Chat with Floating Preview Button ===== */
           <motion.div
             key="chat-layout"
             className="flex h-full w-full overflow-hidden"
@@ -103,21 +101,50 @@ export function MainAppLayout() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            {/* Chat column */}
-            <div className="flex flex-col h-full w-full flex-1 border-r max-w-2xl overflow-hidden">
-              <header className="shrink-0 flex items-center justify-between p-4 border-b bg-background">
-                <h2 className="text-lg font-medium">Chat</h2>
-                <Button variant="outline" size="sm" onClick={handleNewChat}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  <span className="hidden md:inline">New Chat</span>
-                </Button>
+            {/* CHAT COLUMN - Full width on mobile, half on desktop */}
+            <div className="flex flex-col h-full w-full lg:max-w-2xl lg:border-r overflow-hidden">
+              {/* Header */}
+              <header className="shrink-0 flex items-center justify-between p-3 md:p-4 border-b bg-background">
+                <h2 className="text-base md:text-lg font-medium">Chat</h2>
+                <div className="flex items-center gap-2">
+                  {/* Mobile: Show preview button */}
+                  <Sheet open={mobilePreviewOpen} onOpenChange={setMobilePreviewOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="lg:hidden">
+                        <Presentation className="h-4 w-4 mr-2" />
+                        <span className="text-xs">Preview ({pptData?.slides?.length || 0})</span>
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="h-[85vh] p-0">
+                      <div className="flex flex-col h-full">
+                        <SheetHeader className="p-4 border-b shrink-0">
+                          <div className="flex items-center justify-between">
+                            <SheetTitle>Preview</SheetTitle>
+                            <DownloadButton />
+                          </div>
+                        </SheetHeader>
+                        <div className="flex-1 overflow-hidden">
+                          <PPTPreview />
+                        </div>
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+
+                  {/* New Chat Button */}
+                  <Button variant="outline" size="sm" onClick={handleNewChat}>
+                    <Plus className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">New</span>
+                  </Button>
+                </div>
               </header>
+
+              {/* Chat Content */}
               <div className="flex-1 overflow-hidden">
                 <ChatInterface />
               </div>
             </div>
 
-            {/* Preview column – hidden on small screens */}
+            {/* DESKTOP PREVIEW COLUMN - Hidden on mobile */}
             <div className="hidden lg:flex flex-col h-full flex-1 overflow-hidden">
               <header className="shrink-0 flex items-center justify-between p-4 border-b bg-background">
                 <h2 className="text-lg font-medium">Preview</h2>

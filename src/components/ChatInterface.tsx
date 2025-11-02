@@ -57,7 +57,7 @@ export function ChatInterface() {
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
               <div className="flex-1 bg-muted/50 rounded-2xl p-5 border max-w-[85%]">
-                <div className="text-sm text-muted-foreground">Processing...</div>
+                <div className="text-sm text-muted-foreground">Thinking....</div>
               </div>
             </motion.div>
           )}
