@@ -98,7 +98,8 @@ export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
       <Button
         type="submit"
         size="icon"
-        className="absolute bottom-6 right-6 flex-shrink-0"
+        // --- FIX: Use 'shrink-0' ---
+        className="absolute bottom-6 right-6 shrink-0"
         disabled={isLoading || input.trim().length === 0}
       >
         {isLoading ? (

@@ -1,6 +1,7 @@
 import { ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
 import { User, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown'; // <-- Import ReactMarkdown
 
 // Define props for the component
 interface MessageBubbleProps {
@@ -12,15 +13,12 @@ interface MessageBubbleProps {
  * It changes style based on whether the role is 'user' or 'model'.
  */
 export function MessageBubble({ message }: MessageBubbleProps) {
-  // FIX: Removed the extraneous 'S' from this line
   const { role, content } = message;
   const isUser = role === 'user';
 
-  // Base styles for the icon container
   const iconContainerStyles =
-    'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center';
+    'shrink-0 w-8 h-8 rounded-full flex items-center justify-center';
   
-  // Base styles for the message bubble
   const bubbleStyles = 'p-3 rounded-lg max-w-md';
 
   return (
@@ -51,8 +49,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-secondary text-secondary-foreground' // AI: Light gray bg, black text
         )}
       >
-        {/* We can add markdown parsing here later. For now, just text. */}
-        <p className="text-sm whitespace-pre-wrap">{content}</p>
+        {/* --- THIS IS THE FIX --- */}
+        {/* Use ReactMarkdown to render the content.
+            We use the 'prose' class from Tailwind Typography
+            to style the markdown output (like bold, lists, etc.)
+        */}
+        <ReactMarkdown
+          components={{
+            p: ({node, ...props}) => <div className="prose prose-sm dark:prose-invert" {...props} />
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+        {/* --- END FIX --- */}
       </div>
 
       {/* Icon for User */}
