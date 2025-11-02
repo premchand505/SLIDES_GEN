@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-// Import ALL types from our new single source of truth
+// --- FIX: 'partialize' is not imported. ---
+import { persist, createJSONStorage } from 'zustand/middleware'; 
 import type { ChatStore, ChatMessage, PPTData } from '@/types';
 
 /* ---------- initial state ---------- */
@@ -11,21 +12,33 @@ const initialState = {
 };
 
 /* ---------- store ---------- */
-export const useChatStore = create<ChatStore>((set) => ({
-  ...initialState,
+export const useChatStore = create<ChatStore>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  addMessage: (message: ChatMessage) =>
-    set((state) => ({
-      messages: [...state.messages, message],
-    })),
+      addMessage: (message: ChatMessage) =>
+        set((state) => ({
+          messages: [...state.messages, message],
+        })),
 
-  updatePPT: (newPPTData: PPTData) => set({ pptData: newPPTData }),
+      updatePPT: (newPPTData: PPTData) => set({ pptData: newPPTData }),
 
-  setLoading: (isLoading: boolean) => set({ isLoading }),
+      setLoading: (isLoading: boolean) => set({ isLoading }),
 
-  setError: (error: string | null) => set({ error }),
+      setError: (error: string | null) => set({ error }),
 
-  clearChat: () => set(initialState),
-}));
+      clearChat: () => set(initialState),
+    }),
+    {
+      name: 'ai-ppt-chat-storage', 
+      storage: createJSONStorage(() => localStorage),
 
-// --- ALL TYPE DEFINITIONS REMOVED FROM THE BOTTOM OF THIS FILE ---
+      // --- FIX: 'partialize' is a property here. ---
+      partialize: (state) => ({
+        messages: state.messages,
+        pptData: state.pptData,
+      }),
+    }
+  )
+);

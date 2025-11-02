@@ -1,17 +1,17 @@
 'use client'; 
 
-import { useState } from 'react';
+// 1. Remove 'useState' - we won't use it for layout state anymore
 import { ChatInterface } from '@/components/ChatInterface';
 import { PPTPreview } from '@/components/PPTPreview';
 import { InitialPrompt } from '@/components/InitialPrompt';
 import { useChatStore } from '@/store/useChatStore';
 import { AnimatePresence, motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
-// --- FIX: Import types and uuid ---
 import { GeminiResponse, ChatMessage } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-// --- END FIX ---
+import { Button } from '@/components/ui/button'; // <-- Import Button
+import { Plus } from 'lucide-react'; // <-- Import 'Plus' icon
 
 const DownloadButton = dynamic(
   () => import('@/components/DownloadButton').then((mod) => mod.DownloadButton),
@@ -24,22 +24,22 @@ const DownloadButton = dynamic(
 export function MainAppLayout() {
   const { 
     isLoading, 
-    addMessage, // --- FIX: This is now used ---
+    addMessage,
     setLoading, 
     setError, 
     updatePPT, 
-    pptData 
+    pptData,
+    clearChat // <-- 2. Get the 'clearChat' action
   } = useChatStore();
   
-  const [uiState, setUiState] = useState<'initial' | 'chat'>(
-    pptData ? 'chat' : 'initial'
-  );
+  // 3. REMOVE 'useState'. We derive the UI state directly from the store.
+  // The layout will now react automatically when 'clearChat' is called.
+  const hasData = pptData && pptData.slides && pptData.slides.length > 0;
 
   const handleInitialSubmit = async (input: string) => {
     setLoading(true);
     setError(null);
 
-    // --- FIX: Add user message to store ---
     const userMessage: ChatMessage = {
       id: uuidv4(),
       role: 'user',
@@ -47,7 +47,6 @@ export function MainAppLayout() {
       timestamp: new Date(),
     };
     addMessage(userMessage);
-    // --- END FIX ---
 
     try {
       const response = await fetch('/api/gemini', {
@@ -61,7 +60,6 @@ export function MainAppLayout() {
         throw new Error(errorData.error || 'An API error occurred');
       }
 
-      // --- FIX: Use correct type ---
       const data: GeminiResponse = await response.json();
       
       updatePPT({ 
@@ -69,7 +67,6 @@ export function MainAppLayout() {
         globalTheme: data.globalTheme 
       });
 
-      // --- FIX: Add AI response message to store ---
       const aiContent = data.reasoning || `Successfully created ${data.slides.length} slides.`;
       const aiMessage: ChatMessage = {
         id: uuidv4(),
@@ -78,9 +75,9 @@ export function MainAppLayout() {
         timestamp: new Date(),
       };
       addMessage(aiMessage);
-      // --- END FIX ---
-
-      setUiState('chat'); 
+      
+      // We no longer call 'setUiState'. The UI will react
+      // to 'updatePPT' changing 'hasData'.
       
     } catch (error) {
       console.error('Failed to fetch from Gemini API:', error);
@@ -95,13 +92,16 @@ export function MainAppLayout() {
   return (
     <main className="flex h-screen w-full overflow-hidden">
       <AnimatePresence mode="wait">
-        {uiState === 'initial' ? (
+        {/* 4. Use the reactive 'hasData' boolean here */}
+        {!hasData ? (
+          // STATE 1: Initial Prompt
           <InitialPrompt 
             key="initial"
             onSubmit={handleInitialSubmit} 
             isLoading={isLoading} 
           />
         ) : (
+          // STATE 2: Two-Column Chat Layout
           <motion.div 
             key="chat-layout"
             className="flex w-full h-full"
@@ -109,13 +109,24 @@ export function MainAppLayout() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
           >
+            {/* Column 1: Chat Interface */}
             <div className="flex flex-col h-full w-full flex-1 border-r max-w-2xl">
               <header className="flex items-center justify-between p-4 border-b">
                 <h1 className="text-xl font-semibold">AI PPT Chat</h1>
+                {/* 5. ADD THE "NEW CHAT" BUTTON */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => clearChat()}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Chat
+                </Button>
               </header>
               <ChatInterface />
             </div>
 
+            {/* Column 2: PPT Preview */}
             <div className="flex flex-col h-full flex-1">
               <header className="flex items-center justify-between p-4 border-b">
                 <h2 className="text-xl font-semibold">Preview</h2>
