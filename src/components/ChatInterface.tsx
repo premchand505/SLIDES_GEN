@@ -4,11 +4,14 @@ import { useEffect, useRef } from 'react';
 import { useChatStore } from '@/store/useChatStore';
 import { ChatInput } from '@/components/ChatInput';
 import { MessageBubble } from '@/components/MessageBubble';
+// --- FIX: Removed unused 'PPTData' import ---
 import { ChatMessage, GeminiResponse } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
 export function ChatInterface() {
+  // ... (rest of the file is correct)
+  // ...
   const { 
     messages, 
     isLoading, 
@@ -16,7 +19,7 @@ export function ChatInterface() {
     setLoading, 
     setError,
     updatePPT,
-    pptData // <-- 1. Get pptData from the store
+    pptData
   } = useChatStore();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -44,14 +47,11 @@ export function ChatInterface() {
     try {
       const response = await fetch('/api/gemini', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // 2. Add the current 'pptData' to the request body
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           prompt: input,
           history: messages,
-          currentPPT: pptData // <-- This is the key change
+          currentPPT: pptData
         }),
       });
 
@@ -62,7 +62,7 @@ export function ChatInterface() {
 
       const data: GeminiResponse = await response.json();
 
-      const aiContent = data.reasoning || `Successfully generated ${data.slides.length} slides.`;
+      const aiContent = data.reasoning || `Successfully edited slides.`;
       
       const aiMessage: ChatMessage = {
         id: uuidv4(),
@@ -72,10 +72,10 @@ export function ChatInterface() {
       };
       addMessage(aiMessage);
 
-      // 3. This 'updatePPT' call remains the same.
-      // The AI will send a *complete new* slide deck,
-      // and we just replace the old one.
-      updatePPT({ slides: data.slides });
+      updatePPT({ 
+        slides: data.slides, 
+        globalTheme: data.globalTheme 
+      });
 
     } catch (error) {
       console.error('Failed to fetch from Gemini API:', error);
@@ -98,17 +98,25 @@ export function ChatInterface() {
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">
-              No messages yet. Start a conversation!
-            </p>
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))
+        {messages.length === 0 && (
+          <MessageBubble 
+            message={{
+              id: 'intro-msg',
+              role: 'model',
+              content: `Your presentation is ready! You can see the preview on the right.
+
+Use this chat to make edits. For example:
+- "Change the title of slide 3"
+- "Add a slide about..."
+- "Delete slide 2"`,
+              timestamp: new Date()
+            }}
+          />
         )}
+        
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
         <div ref={messagesEndRef} />
       </div>
       <ChatInput onSubmit={handleChatSubmit} isLoading={isLoading} />

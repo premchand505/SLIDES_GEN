@@ -2,12 +2,21 @@
  * Represents the structure of a single PowerPoint slide.
  * This is the master type used by the AI, the store, and the generator.
  */
+export type SlideDesign = {
+  backgroundColor: string; // e.g., "#FFFFFF"
+  textColor: string;       // e.g., "#333333"
+  titleFont: string;       // e.g., "Arial"
+  bodyFont: string;        // e.g., "Calibri"
+  accentColor: string;     // e.g., "#0078D4"
+};
+
 export type SlideContent = {
   // Use a strict union for AI generation, but allow string for flexibility
   layout: 'title' | 'content' | 'section' | 'twocolumn' | string;
   title: string;      // Title is required
   subtitle?: string;  // Subtitle is optional (for title slides)
   content: string[];  // Array of bullet points or paragraphs
+  design: SlideDesign;
 };
 
 /**
@@ -16,6 +25,7 @@ export type SlideContent = {
 export type PPTData = {
   title?: string; // Optional overall presentation title
   slides: SlideContent[];
+  globalTheme?: SlideDesign;
 };
 
 /**
@@ -40,6 +50,7 @@ export type GeminiResponse = {
   action: AIAction;
   slides: SlideContent[];
   reasoning?: string;
+  globalTheme?: SlideDesign;
 };
 
 /**
