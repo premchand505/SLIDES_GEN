@@ -40,7 +40,7 @@ export function ChatInterface() {
   }, [storeMessages]);
 
   /**
-   * Extract all complete <thought> and <action> tags from text
+   * Extract all complete <thought> tags from text
    */
   const extractThoughtSteps = (text: string): ThinkingStep[] => {
     const steps: ThinkingStep[] = [];
@@ -59,39 +59,12 @@ export function ChatInterface() {
       }
     }
 
-    // Find all complete <action tool="...">...</action> tags
-    const actionRegex = /<action\s+tool="(webSearch|readWebsite)">([\s\S]*?)<\/action>/g;
-    
-    while ((match = actionRegex.exec(text)) !== null) {
-      const tool = match[1] as 'webSearch' | 'readWebsite';
-      const content = match[2].trim();
-      if (content) {
-        steps.push({
-          type: 'action',
-          tool: tool,
-          content: content,
-        });
-      }
-    }
-
-    // Sort steps by their position in the original text to maintain order
-    steps.sort((a, b) => {
-      const aIndex = text.indexOf(a.content);
-      const bIndex = text.indexOf(b.content);
-      return aIndex - bIndex;
-    });
-
-    // Check for incomplete tags (currently streaming)
+    // Check for incomplete thought (currently streaming)
     const lastThoughtStart = text.lastIndexOf('<thought>');
     const lastThoughtEnd = text.lastIndexOf('</thought>');
-    const lastActionStart = text.lastIndexOf('<action');
-    const lastActionEnd = text.lastIndexOf('</action>');
     
-    // Check which tag is streaming (most recent unclosed tag)
-    const streamingThought = lastThoughtStart > lastThoughtEnd;
-    const streamingAction = lastActionStart > lastActionEnd;
-    
-    if (streamingThought && lastThoughtStart > lastActionStart) {
+    if (lastThoughtStart > lastThoughtEnd) {
+      // There's an unclosed thought tag - extract the streaming content
       const streamingContent = text.substring(lastThoughtStart + 9).trim();
       if (streamingContent && streamingContent.length > 0) {
         steps.push({
@@ -100,25 +73,21 @@ export function ChatInterface() {
           isStreaming: true,
         });
       }
-    } else if (streamingAction && lastActionStart > lastThoughtStart) {
-      // Extract tool type
-      const toolMatch = text.substring(lastActionStart).match(/tool="(webSearch|readWebsite)"/);
-      const tool = toolMatch ? (toolMatch[1] as 'webSearch' | 'readWebsite') : undefined;
-      
-      const actionStartTag = text.substring(lastActionStart).indexOf('>') + lastActionStart + 1;
-      const streamingContent = text.substring(actionStartTag).trim();
-      
-      if (streamingContent && streamingContent.length > 0 && tool) {
-        steps.push({
-          type: 'action',
-          tool: tool,
-          content: streamingContent,
-          isStreaming: true,
-        });
-      }
     }
     
     return steps;
+  };
+
+  const convertStepsToMessages = (steps: ThinkingStep[]): ChatMessage[] => {
+    return steps
+      .filter(step => !step.isStreaming && step.content.length > 0)
+      .map(step => ({
+        id: uuidv4(),
+        role: 'model' as const,
+        content: step.content,
+        timestamp: new Date(),
+        thinkingStep: step,
+      }));
   };
 
   const handleChatSubmit = async (input: string) => {
@@ -135,7 +104,8 @@ export function ChatInterface() {
     setUiMessages(prev => [...prev, userMessage]);
 
     let accumulatedText = "";
-    let previousStepCount = 0;
+    let finalThinkingSteps: ThinkingStep[] = [];
+    let jsonStarted = false;
 
     try {
       const response = await fetch('/api/gemini', {
@@ -166,50 +136,30 @@ export function ChatInterface() {
 
         // Check if JSON part has started
         if (accumulatedText.includes(STREAM_SEPARATOR)) {
-          // Clear streaming steps once we hit the JSON
-          setStreamingSteps([]);
-          break;
+          if (!jsonStarted) {
+            jsonStarted = true;
+            console.log('📍 JSON separator found');
+            
+            // Extract only the thinking part (before separator)
+            const thinkingPart = accumulatedText.split(STREAM_SEPARATOR)[0];
+            finalThinkingSteps = extractThoughtSteps(thinkingPart);
+            setStreamingSteps([]); // Clear streaming since we're done with thinking
+          }
+        } else {
+          // Still in thinking phase - update streaming steps
+          const currentSteps = extractThoughtSteps(accumulatedText);
+          setStreamingSteps(currentSteps);
+          finalThinkingSteps = currentSteps;
         }
-
-        // Still in thinking phase - extract and update steps
-        const currentSteps = extractThoughtSteps(accumulatedText);
-        
-        // Convert completed steps to messages
-        const completedSteps = currentSteps.filter(step => !step.isStreaming);
-        
-        // If we have new completed steps, save them as messages
-        if (completedSteps.length > previousStepCount) {
-          const newSteps = completedSteps.slice(previousStepCount);
-          
-          newSteps.forEach(step => {
-            const thinkingMessage: ChatMessage = {
-              id: uuidv4(),
-              role: 'model',
-              content: step.content,
-              timestamp: new Date(),
-              thinkingStep: step,
-            };
-            addMessage(thinkingMessage);
-            setUiMessages(prev => [...prev, thinkingMessage]);
-          });
-          
-          previousStepCount = completedSteps.length;
-        }
-        
-        // Show only the currently streaming step (if any)
-        const streamingStep = currentSteps.find(step => step.isStreaming);
-        setStreamingSteps(streamingStep ? [streamingStep] : []);
       }
 
       console.log('✅ Stream complete');
-      setStreamingSteps([]);
 
-      // Continue reading to get the JSON part
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulatedText += decoder.decode(value, { stream: true });
-      }
+      // Convert thinking steps to permanent messages
+      const thinkingMessages = convertStepsToMessages(finalThinkingSteps);
+      thinkingMessages.forEach(msg => addMessage(msg));
+      setUiMessages(prev => [...prev, ...thinkingMessages]);
+      setStreamingSteps([]);
 
       // Extract and parse JSON
       if (!accumulatedText.includes(STREAM_SEPARATOR)) {

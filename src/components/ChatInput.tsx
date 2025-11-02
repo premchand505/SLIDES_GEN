@@ -3,7 +3,8 @@
 import { useState, useRef, FormEvent } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2 } from 'lucide-react';
+// --- MODIFICATION: Added Paperclip icon ---
+import { Send, Loader2, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Define props for the component
@@ -89,17 +90,31 @@ export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
         placeholder="Send a message to edit your slides..."
         // Set a max-height and make it scrollable beyond that
         className={cn(
-  'min-h-10 max-h-[200px] resize-none overflow-y-auto pr-16',
-  'bg-secondary text-secondary-foreground'
-)}
+          // --- MODIFICATION: Changed pr-16 to pr-28 to make room for 2 buttons ---
+          'min-h-10 max-h-[200px] resize-none overflow-y-auto pr-28',
+          'bg-secondary text-secondary-foreground'
+        )}
         rows={1}
         disabled={isLoading}
       />
+
+      {/* --- MODIFICATION: Added dummy attachment button --- */}
+      <Button
+        type="button" // Important: type="button" to prevent form submission
+        size="icon"
+        variant="ghost" // Use ghost to make it less prominent than Send
+        className="absolute bottom-6 right-20 shrink-0" // Position left of Send button
+        disabled={isLoading}
+      >
+        <Paperclip className="h-4 w-4" />
+        <span className="sr-only">Attach file (dummy)</span>
+      </Button>
+
       <Button
         type="submit"
         size="icon"
         // --- FIX: Use 'shrink-0' ---
-        className="absolute bottom-6 right-6 shrink-0"
+        className="absolute bottom-6 right-6 shrink-0" // Original position
         disabled={isLoading || input.trim().length === 0}
       >
         {isLoading ? (
