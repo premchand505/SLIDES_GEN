@@ -595,36 +595,6 @@ export function MyComponent({ ... }: Props) {
 - [API Routes](https://nextjs.org/docs/app/building-your-application/routing/route-handlers)
 - [Streaming](https://nextjs.org/docs/app/building-your-application/routing/loading-ui-and-streaming)
 
-## 🗺️ Roadmap
-
-### Phase 1: Core Features ✅
-- [x] AI-powered slide generation
-- [x] Chat interface
-- [x] PPTX export
-- [x] Design system with 5 templates
-- [x] Mobile responsiveness
-- [x] Session management
-
-### Phase 2: Enhancement (In Progress)
-- [ ] Chart generation (bar, line, pie)
-- [ ] Custom template creator
-- [ ] Collaboration features (share presentations)
-- [ ] PDF export
-- [ ] Animation presets for slides
-
-### Phase 3: Advanced Features
-- [ ] Voice input for prompts
-- [ ] Multi-language support
-- [ ] Brand kit integration (logos, colors)
-- [ ] Slide version history
-- [ ] AI presentation coach (suggestions)
-
-### Phase 4: Enterprise
-- [ ] Team workspaces
-- [ ] SSO authentication
-- [ ] Custom AI model fine-tuning
-- [ ] Analytics dashboard
-- [ ] API for developers
 
 🎯 Extra Features (Beyond Requirements)
 
@@ -632,7 +602,7 @@ User profile system
 5 professional design templates
 Mobile-responsive interface
 Real-time AI thinking visualization
-Advanced layout system (20+ unique layouts)
+Advanced layout system 
 Image integration (Pexels API)
 Keyboard shortcuts and gestures
 Error handling and user feedback
@@ -642,3 +612,4 @@ Built with ❤️ for the Full-Stack Developer Assignment
 Demo Video: 
 Live App: https://slides-genai.vercel.app
 Source Code: https://github.com/premchand505/SLIDES_GEN
+My Website: https://premchandgeddada.com
