@@ -1,14 +1,16 @@
+// components/MainAppLayout.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { ChatInterface } from '@/components/ChatInterface';
 import { PPTPreview } from '@/components/PPTPreview';
 import { InitialPrompt } from '@/components/InitialPrompt';
+// ✅ REMOVED: UserProfileSetup import (not used in this component)
 import { useChatStore } from '@/store/useChatStore';
 import { AnimatePresence, motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { Plus, Home, Presentation} from 'lucide-react';
+import { Plus, Home, Presentation } from 'lucide-react';
 import { AppShell } from '@/components/Appshell';
 import { useGeneration } from '@/hooks/useGeneration';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';

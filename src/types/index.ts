@@ -1,3 +1,4 @@
+// types/index.ts
 /**
  * Represents the design styling for a slide
  */
@@ -7,10 +8,11 @@ export type SlideDesign = {
   titleFont: string;
   bodyFont: string;
   accentColor: string;
+  imageQuery?: string; // For Unsplash image search
 };
 
 /**
- * ✅ FIXED: Strict layout types only
+ * Strict layout types only
  */
 export type SlideLayout = 'title' | 'content' | 'section' | 'twocolumn';
 
@@ -18,7 +20,7 @@ export type SlideLayout = 'title' | 'content' | 'section' | 'twocolumn';
  * Represents the structure of a single PowerPoint slide.
  */
 export type SlideContent = {
-  layout: SlideLayout; // ✅ Now type-safe
+  layout: SlideLayout;
   title: string;
   subtitle?: string;
   content?: string[];
@@ -39,6 +41,7 @@ export type PPTData = {
   title?: string;
   slides: SlideContent[];
   globalTheme?: SlideDesign;
+  template?: string; // Template name for consistency
 };
 
 /**
@@ -65,6 +68,7 @@ export type GeminiResponse = {
   slides: SlideContent[];
   reasoning?: string;
   globalTheme?: SlideDesign;
+  template?: string;
 };
 
 /**

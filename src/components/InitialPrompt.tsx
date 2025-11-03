@@ -1,6 +1,7 @@
+// components/InitialPrompt.tsx
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Send, Loader2, Paperclip, Sparkles } from 'lucide-react';
@@ -20,6 +21,28 @@ const dummyTopics = [
 
 export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
   const [input, setInput] = useState('');
+  const [userName, setUserName] = useState('');
+
+  // ✅ FIXED: Properly load user name on mount
+  useEffect(() => {
+    const loadUserProfile = () => {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('user-profile');
+        if (stored) {
+          try {
+            const profile = JSON.parse(stored);
+            if (profile.name) {
+              setUserName(profile.name);
+            }
+          } catch (error) {
+            console.error('Failed to parse user profile:', error);
+          }
+        }
+      }
+    };
+    
+    loadUserProfile();
+  }, []);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,7 +71,9 @@ export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
         <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-primary/10 mb-3 md:mb-4">
           <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-primary" />
         </div>
-        <h2 className="text-2xl md:text-4xl font-bold mb-2">Welcome to SLIDES GEN</h2>
+        <h2 className="text-2xl md:text-4xl font-bold mb-2">
+          {userName ? `Welcome back, ${userName}! 👋` : 'Welcome to SLIDES GEN! 👋'}
+        </h2>
         <p className="text-sm md:text-lg text-muted-foreground px-4">
           Generate professional slides in seconds with AI
         </p>
@@ -122,13 +147,13 @@ export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
         </div>
         <div className="p-4 rounded-lg bg-muted/50">
           <div className="text-2xl mb-2">🎨</div>
-          <h3 className="font-semibold text-sm mb-1">Beautiful Design</h3>
-          <p className="text-xs text-muted-foreground">Professional templates</p>
+          <h3 className="font-semibold text-sm mb-1">5 Stunning Templates</h3>
+          <p className="text-xs text-muted-foreground">Professional design patterns</p>
         </div>
         <div className="p-4 rounded-lg bg-muted/50">
           <div className="text-2xl mb-2">✨</div>
           <h3 className="font-semibold text-sm mb-1">AI Powered</h3>
-          <p className="text-xs text-muted-foreground">Smart content generation</p>
+          <p className="text-xs text-muted-foreground">Smart content + design generation</p>
         </div>
       </div>
     </motion.div>

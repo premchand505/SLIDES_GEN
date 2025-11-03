@@ -1,3 +1,4 @@
+// app/api/gemini/route.ts
 import {
   GoogleGenerativeAI,
   GenerationConfig,
@@ -6,6 +7,7 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { PPTData, GeminiResponse } from "@/types";
+import { selectTemplateFromTopic, DESIGN_TEMPLATES, getImageQuery } from '@/lib/designSystem';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
@@ -22,7 +24,7 @@ const generationConfig: GenerationConfig = {
   topK: 40,
   topP: 0.95,
   maxOutputTokens: 8192,
-  responseMimeType: "application/json", // Force JSON mode
+  responseMimeType: "application/json",
 };
 
 const safetySettings: SafetySetting[] = [
@@ -32,137 +34,91 @@ const safetySettings: SafetySetting[] = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-const getSystemInstruction = (currentPPT: PPTData | null): string => {
+const getSystemInstruction = (currentPPT: PPTData | null, topic: string): string => {
+  const selectedTemplate = selectTemplateFromTopic(topic);
+  const templateDesign = DESIGN_TEMPLATES[selectedTemplate];
+  const imageQuery = getImageQuery(topic);
+
   let contextInstruction: string;
   if (currentPPT) {
-    contextInstruction = `Edit this existing presentation:
+    contextInstruction = `Edit this existing presentation, maintaining the SAME design template (${currentPPT.template || selectedTemplate}):
 ${JSON.stringify(currentPPT, null, 2)}
 
-Return the COMPLETE updated presentation with ALL slides.`;
+CRITICAL: Keep the EXACT SAME color palette and design template across ALL slides.`;
   } else {
-    contextInstruction = `Create a NEW presentation from scratch.`;
+    contextInstruction = `Create a NEW presentation using the "${selectedTemplate}" design template.`;
   }
 
-  return `You are an expert AI presentation designer.
+  return `You are an expert AI presentation designer with a focus on visual consistency and stunning layouts.
 
 ${contextInstruction}
+
+DESIGN TEMPLATE: ${selectedTemplate}
+COLOR PALETTE (USE THESE EXACT COLORS FOR ALL SLIDES):
+- Primary: #${templateDesign.palette.primary}
+- Secondary: #${templateDesign.palette.secondary}
+- Accent: #${templateDesign.palette.accent}
+- Background: #${templateDesign.palette.background}
+- Text: #${templateDesign.palette.text}
+- Text Light: #${templateDesign.palette.textLight}
+
+FONTS (USE CONSISTENTLY):
+- Title Font: ${templateDesign.fonts.title}
+- Body Font: ${templateDesign.fonts.body}
+
+IMAGE SUGGESTIONS: ${imageQuery}
 
 You must return a JSON object with this EXACT structure:
 
 {
   "thinking": [
-    "First major planning step: explain what you're planning and why",
-    "Second thinking step: what content structure makes sense",
-    "Third step: design decisions and color choices",
-    "Fourth step: how you'll organize the information",
-    "Fifth step: final synthesis and approach"
+    "Planning: Analyzing topic and selecting appropriate design approach",
+    "Structure: Determining slide sequence and content distribution",
+    "Design: Applying ${selectedTemplate} template with consistent color palette",
+    "Content: Creating compelling and clear information hierarchy",
+    "Refinement: Ensuring visual consistency across all slides"
   ],
   "presentation": {
     "action": "create",
+    "template": "${selectedTemplate}",
     "globalTheme": {
-      "backgroundColor": "#FFFFFF",
-      "textColor": "#1A1A1A",
-      "titleFont": "Arial",
-      "bodyFont": "Calibri",
-      "accentColor": "#3B82F6"
+      "backgroundColor": "#${templateDesign.palette.background}",
+      "textColor": "#${templateDesign.palette.text}",
+      "titleFont": "${templateDesign.fonts.title}",
+      "bodyFont": "${templateDesign.fonts.body}",
+      "accentColor": "#${templateDesign.palette.accent}",
+      "imageQuery": "${imageQuery}"
     },
     "slides": [
       {
         "layout": "title",
-        "title": "Main Title",
+        "title": "Presentation Title",
         "subtitle": "Subtitle text",
         "content": [],
         "design": {
-          "backgroundColor": "#FFFFFF",
-          "textColor": "#1A1A1A",
-          "titleFont": "Arial",
-          "bodyFont": "Calibri",
-          "accentColor": "#3B82F6"
-        }
-      },
-      {
-        "layout": "content",
-        "title": "Slide Title",
-        "content": [
-          "First point with detailed information",
-          "Second point explaining key concepts",
-          "Third point with supporting details"
-        ],
-        "design": {
-          "backgroundColor": "#FFFFFF",
-          "textColor": "#1A1A1A",
-          "titleFont": "Arial",
-          "bodyFont": "Calibri",
-          "accentColor": "#3B82F6"
+          "backgroundColor": "#${templateDesign.palette.background}",
+          "textColor": "#${templateDesign.palette.text}",
+          "titleFont": "${templateDesign.fonts.title}",
+          "bodyFont": "${templateDesign.fonts.body}",
+          "accentColor": "#${templateDesign.palette.accent}"
         }
       }
     ]
   }
 }
 
-CRITICAL RULES:
-- thinking array must have 4-8 strings showing your planning process
-- Each thinking string should be 2-4 sentences explaining your approach
-- Valid layouts: "title", "content", "section", "twocolumn"
-- Each slide MUST have: layout, title, content (array), design (object)
-- content must be an array of strings (can be empty for title slides)
-- Choose professional color schemes with good contrast
-- Create 4-6 slides minimum for comprehensive coverage
+CRITICAL CONSISTENCY RULES:
+1. ALL slides MUST use the EXACT SAME color palette from the globalTheme
+2. NEVER mix different color schemes within one presentation
+3. backgroundColor, textColor, accentColor must be IDENTICAL across ALL slides
+4. Only vary layout type, not colors
+5. The template field must be "${selectedTemplate}" for all operations
+6. Create 5-7 slides for comprehensive coverage
+7. Each slide design object should match the globalTheme EXACTLY
 
-EXAMPLE for "Artificial Intelligence" topic:
+Valid layouts: "title", "content", "section", "twocolumn"
 
-{
-  "thinking": [
-    "Planning Structure: I'll create a 6-slide presentation about AI covering fundamentals, applications, benefits, challenges, ethics, and future outlook. This provides a comprehensive overview suitable for general audiences.",
-    "Content Strategy: Each slide will focus on one key aspect. The title slide introduces the topic, followed by definition slides with clear explanations, practical applications to show real-world impact, and concluding with forward-looking perspectives.",
-    "Design Approach: I'll use a modern tech aesthetic with blue accent color to convey trust and innovation. White backgrounds ensure readability with dark gray text for strong contrast. Arial for titles provides clarity while Calibri ensures comfortable reading.",
-    "Information Flow: The presentation will progress logically from concepts to applications to implications, making it both educational and engaging for viewers unfamiliar with the subject."
-  ],
-  "presentation": {
-    "action": "create",
-    "globalTheme": {
-      "backgroundColor": "#FFFFFF",
-      "textColor": "#2C3E50",
-      "titleFont": "Arial",
-      "bodyFont": "Calibri",
-      "accentColor": "#3498DB"
-    },
-    "slides": [
-      {
-        "layout": "title",
-        "title": "Artificial Intelligence",
-        "subtitle": "Transforming How We Live and Work",
-        "content": [],
-        "design": {
-          "backgroundColor": "#FFFFFF",
-          "textColor": "#2C3E50",
-          "titleFont": "Arial",
-          "bodyFont": "Calibri",
-          "accentColor": "#3498DB"
-        }
-      },
-      {
-        "layout": "content",
-        "title": "What is AI?",
-        "content": [
-          "Computer systems that can perform tasks requiring human intelligence",
-          "Includes machine learning, deep learning, and neural networks",
-          "Enables computers to learn from data and improve over time",
-          "Powers applications from voice assistants to autonomous vehicles"
-        ],
-        "design": {
-          "backgroundColor": "#FFFFFF",
-          "textColor": "#2C3E50",
-          "titleFont": "Arial",
-          "bodyFont": "Calibri",
-          "accentColor": "#3498DB"
-        }
-      }
-    ]
-  }
-}
-
-Return ONLY valid JSON matching this structure.`;
+Return ONLY valid JSON matching this structure with CONSISTENT colors.`;
 };
 
 export async function POST(request: Request) {
@@ -179,10 +135,10 @@ export async function POST(request: Request) {
       });
     }
 
-    const systemInstruction = getSystemInstruction(currentPPT);
+    const systemInstruction = getSystemInstruction(currentPPT, prompt);
     const fullPrompt = `${systemInstruction}\n\nUser Request: ${prompt}\n\nGenerate the presentation about: ${prompt}`;
 
-    console.log('🚀 Starting generation in JSON mode...');
+    console.log('🚀 Starting generation with template selection...');
 
     const result = await model.generateContentStream({
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
@@ -197,18 +153,15 @@ export async function POST(request: Request) {
         let thinkingStepsSent = false;
 
         try {
-          // Collect all chunks
           for await (const chunk of result.stream) {
             const text = chunk.text();
             if (text) {
               fullResponseText += text;
               
-              // Try to parse incrementally for thinking steps
               if (!thinkingStepsSent) {
                 try {
                   const partial = JSON.parse(fullResponseText);
                   if (partial.thinking && Array.isArray(partial.thinking)) {
-                    // Send thinking steps as they come
                     for (const thought of partial.thinking) {
                       const thinkingMsg = `<thought>${thought}</thought>\n`;
                       controller.enqueue(encoder.encode(thinkingMsg));
@@ -216,7 +169,7 @@ export async function POST(request: Request) {
                     thinkingStepsSent = true;
                   }
                 } catch {
-                  // Not complete yet, continue
+                  // Not complete yet
                 }
               }
             }
@@ -224,7 +177,6 @@ export async function POST(request: Request) {
 
           console.log('✅ Stream complete, length:', fullResponseText.length);
 
-          // Parse the complete response
           const responseData = JSON.parse(fullResponseText);
           
           if (!responseData.presentation) {
@@ -233,18 +185,22 @@ export async function POST(request: Request) {
 
           const presentation: GeminiResponse = responseData.presentation;
 
-          console.log('✅ JSON parsed, slides:', presentation.slides?.length || 0);
-
-          // Apply global theme
+          // CRITICAL: Enforce design consistency
           if (presentation.globalTheme) {
+            const globalTheme = presentation.globalTheme;
             presentation.slides = presentation.slides.map(slide => ({
               ...slide,
-              design: slide.design || presentation.globalTheme!,
+              design: {
+                backgroundColor: globalTheme.backgroundColor,
+                textColor: globalTheme.textColor,
+                titleFont: globalTheme.titleFont,
+                bodyFont: globalTheme.bodyFont,
+                accentColor: globalTheme.accentColor,
+              },
               content: slide.content || [],
             }));
           }
 
-          // Validate slides
           const validSlides = presentation.slides.filter(slide => 
             slide.title && 
             slide.layout && 
@@ -258,9 +214,8 @@ export async function POST(request: Request) {
 
           presentation.slides = validSlides;
 
-          console.log('✅ Valid slides:', validSlides.length);
+          console.log('✅ Valid slides with consistent design:', validSlides.length);
 
-          // Send success response with separator
           const successMsg = { type: "done", data: presentation };
           controller.enqueue(encoder.encode(`\n<<<JSON_START>>>\n${JSON.stringify(successMsg)}`));
 
