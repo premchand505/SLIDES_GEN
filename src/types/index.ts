@@ -27,6 +27,9 @@ export type SlideContent = {
   design: SlideDesign;
 };
 
+/**
+ * Represents a thinking step in the AI generation process
+ */
 export type ThinkingStep = {
   type: 'thought' | 'action';
   tool?: 'webSearch' | 'readWebsite';

@@ -1,3 +1,4 @@
+// hooks/useGeneration.ts
 import { useChatStore } from '@/store/useChatStore';
 import { toast } from 'sonner';
 import { ChatMessage, ThinkingStep } from '@/types';
@@ -6,34 +7,49 @@ import { v4 as uuidv4 } from 'uuid';
 const STREAM_SEPARATOR = "\n<<<JSON_START>>>\n";
 
 /**
- * Extract all complete <thought> tags from text
+ * Extract thinking steps with enhanced parsing
  */
 function extractThoughtSteps(text: string): ThinkingStep[] {
   const steps: ThinkingStep[] = [];
   
-  // Find all complete <thought>...</thought> tags
-  const thoughtRegex = /<thought>([\s\S]*?)<\/thought>/g;
+  // Enhanced regex to capture type and tool attributes
+  const thoughtRegex = /<thought(?:\s+type="(thought|action)")?(?:\s+tool="(webSearch|readWebsite)")?>[\s\S]*?<\/thought>/g;
   let match;
   
   while ((match = thoughtRegex.exec(text)) !== null) {
-    const content = match[1].trim();
+    const fullMatch = match[0];
+    const type = match[1] as 'thought' | 'action' || 'thought';
+    const tool = match[2] as 'webSearch' | 'readWebsite' | undefined;
+    
+    // Extract content between tags
+    const contentMatch = fullMatch.match(/<thought[^>]*>([\s\S]*?)<\/thought>/);
+    const content = contentMatch ? contentMatch[1].trim() : '';
+    
     if (content) {
       steps.push({
-        type: 'thought',
-        content: content,
+        type,
+        tool,
+        content,
       });
     }
   }
 
   // Check for incomplete thought (currently streaming)
-  const lastThoughtStart = text.lastIndexOf('<thought>');
+  const lastThoughtStart = text.lastIndexOf('<thought');
   const lastThoughtEnd = text.lastIndexOf('</thought>');
   
   if (lastThoughtStart > lastThoughtEnd && lastThoughtStart !== -1) {
-    const streamingContent = text.substring(lastThoughtStart + 9).trim();
+    const streamingMatch = text.substring(lastThoughtStart).match(/<thought[^>]*>([\s\S]*)/);
+    const streamingContent = streamingMatch ? streamingMatch[1].trim() : '';
+    
     if (streamingContent && streamingContent.length > 0) {
+      // Try to detect type from tag attributes
+      const typeMatch = text.substring(lastThoughtStart).match(/type="(thought|action)"/);
+      const toolMatch = text.substring(lastThoughtStart).match(/tool="(webSearch|readWebsite)"/);
+      
       steps.push({
-        type: 'thought',
+        type: (typeMatch?.[1] as 'thought' | 'action') || 'thought',
+        tool: toolMatch?.[1] as 'webSearch' | 'readWebsite' | undefined,
         content: streamingContent,
         isStreaming: true,
       });
@@ -95,7 +111,7 @@ export function useGeneration() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      console.log('🔄 Starting stream...');
+      console.log('📄 Starting stream...');
 
       while (true) {
         const { done, value } = await reader.read();
@@ -118,7 +134,7 @@ export function useGeneration() {
       console.log('✅ Stream complete');
 
       // If no separator found, check if we have thinking tags anyway
-      if (!jsonStarted && accumulatedText.includes('<thought>')) {
+      if (!jsonStarted && accumulatedText.includes('<thought')) {
         console.log('⚠️ Found thinking tags but no separator, extracting anyway...');
         const lastThoughtEnd = accumulatedText.lastIndexOf('</thought>');
         if (lastThoughtEnd !== -1) {
@@ -161,13 +177,15 @@ export function useGeneration() {
         const finalMessage: ChatMessage = {
           id: uuidv4(),
           role: 'model',
-          content: `✓ Generated ${slideCount} slide${slideCount !== 1 ? 's' : ''}`,
+          content: `✓ Successfully generated ${slideCount} slide${slideCount !== 1 ? 's' : ''} with rich content`,
           timestamp: new Date(),
         };
         addMessage(finalMessage);
         updatePPT(doneData.data);
         
-        toast.success(`${slideCount} slides created!`);
+        toast.success(`${slideCount} slides created!`, {
+          description: 'Your presentation is ready',
+        });
         
       } else if (doneData.type === 'error') {
         throw new Error(doneData.error || 'Unknown error from API');
@@ -178,7 +196,9 @@ export function useGeneration() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "An unknown error occurred";
       console.error("❌ Error:", message);
-      toast.error(message);
+      toast.error('Generation failed', {
+        description: message,
+      });
       
       const errorMessage: ChatMessage = {
         id: uuidv4(),

@@ -1,4 +1,4 @@
-// lib/pptGenerator.ts
+// lib/pptGenerator.ts - FINAL FIXED VERSION
 import PptxGenJS from 'pptxgenjs';
 import { PPTData, SlideDesign, SlideLayout } from '@/types';
 import { DESIGN_TEMPLATES, getUnsplashUrl, type DesignTemplate } from '@/lib/designSystem';
@@ -123,22 +123,23 @@ export const generatePresentationAsBase64 = async (
     const layoutKey = normalizeLayout(slideData.layout);
     const slide = pres.addSlide();
     
-    const isDarkBg = isColorDark(cleanedDesign.backgroundColor);
-    const primaryTextColor = isDarkBg ? 'FFFFFF' : cleanedDesign.textColor;
-    const lightAccent = lightenColor(cleanedDesign.accentColor, 0.3);
-    const darkAccent = darkenColor(cleanedDesign.accentColor, 0.2);
+    // Color contrast check (retained for potential design use)
+    isColorDark(cleanedDesign.backgroundColor);
 
     try {
       switch (layoutKey) {
         case 'title': {
           const titleLayout = templateConfig.titleLayout;
           
-          // Background
           slide.background = { fill: cleanedDesign.accentColor };
 
-          // Add decorative elements from template
+          if (templateConfig.imageStyle === 'overlay' || templateConfig.imageStyle === 'full') {
+            const imageUrl = getUnsplashUrl(imageQuery + ',abstract,gradient', 1920, 1080);
+            await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 25);
+          }
+
           titleLayout.decorativeElements.forEach(elem => {
-            const pxToInch = (px: number) => px / 96; // 96 DPI standard
+            const pxToInch = (px: number) => px / 96;
             
             switch (elem.type) {
               case 'circle':
@@ -186,13 +187,6 @@ export const generatePresentationAsBase64 = async (
             }
           });
 
-          // Add image if template supports it (commented out to avoid unused var warning)
-           if (templateConfig.imageStyle === 'overlay') {
-             const imageUrl = getUnsplashUrl(imageQuery + ',gradient', 1920, 1080);
-             await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 20);
-           }
-
-          // Title
           slide.addText(cleanText(slideData.title) ?? 'Untitled', {
             x: 1, y: 1.8, w: 8, h: 1.5,
             fontSize: 52,
@@ -211,7 +205,6 @@ export const generatePresentationAsBase64 = async (
             },
           });
 
-          // Subtitle
           if (slideData.subtitle) {
             slide.addText(cleanText(slideData.subtitle), {
               x: 1.5, y: 3.5, w: 7, h: 0.8,
@@ -228,31 +221,32 @@ export const generatePresentationAsBase64 = async (
         case 'section': {
           slide.background = { fill: cleanedDesign.backgroundColor };
 
-          // Left colored panel
+          if (templateConfig.imageStyle === 'side') {
+            const imageUrl = getUnsplashUrl(imageQuery, 960, 1080);
+            await addImageToSlide(slide, imageUrl, 5, 0, 5, 5.625, 40);
+          }
+
           slide.addShape(pres.ShapeType.rect, {
             x: 0, y: 0, w: 5, h: 5.625,
             fill: { color: cleanedDesign.accentColor },
             line: { type: 'none' },
           });
 
-          // Decorative elements from template
-          const contentLayout = templateConfig.contentLayout;
-          contentLayout.decorativeElements.forEach(elem => {
-            const pxToInch = (px: number) => px / 96;
-            
-            if (elem.type === 'rectangle') {
-              slide.addShape(pres.ShapeType.rect, {
-                x: pxToInch(elem.x),
-                y: pxToInch(elem.y),
-                w: pxToInch(elem.width),
-                h: pxToInch(elem.height),
-                fill: { color: elem.color, transparency: 100 - elem.opacity },
-                line: { type: 'none' },
-              });
-            }
+          const lightAccent = lightenColor(cleanedDesign.accentColor, 0.3);
+          const darkAccent = darkenColor(cleanedDesign.accentColor, 0.2);
+
+          slide.addShape(pres.ShapeType.ellipse, {
+            x: 3, y: -1, w: 4, h: 4,
+            fill: { color: lightAccent, transparency: 70 },
+            line: { type: 'none' },
           });
 
-          // Section title
+          slide.addShape(pres.ShapeType.ellipse, {
+            x: -0.5, y: 4, w: 3, h: 3,
+            fill: { color: darkAccent, transparency: 60 },
+            line: { type: 'none' },
+          });
+
           slide.addText(cleanText(slideData.title) ?? 'Section', {
             x: 0.5, y: 2.3, w: 4, h: 1.2,
             fontSize: 44,
@@ -263,7 +257,6 @@ export const generatePresentationAsBase64 = async (
             fontFace: cleanedDesign.titleFont,
           });
 
-          // Accent line
           slide.addShape(pres.ShapeType.rect, {
             x: 0.5, y: 3.6, w: 2, h: 0.08,
             fill: { color: 'FFFFFF' },
@@ -277,23 +270,30 @@ export const generatePresentationAsBase64 = async (
         default: {
           slide.background = { fill: cleanedDesign.backgroundColor };
 
-          // Add background image for supported templates (commented to avoid unused warnings)
-           if (templateConfig.imageStyle === 'overlay') {
-             const imageUrl = getUnsplashUrl(imageQuery, 1920, 1080);
-             await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 15);
-           } else if (templateConfig.imageStyle === 'side') {
+          if (templateConfig.imageStyle === 'overlay') {
+            const imageUrl = getUnsplashUrl(imageQuery, 1920, 1080);
+            await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 15);
+          } else if (templateConfig.imageStyle === 'side') {
             const imageUrl = getUnsplashUrl(imageQuery, 960, 1080);
-            await addImageToSlide(slide, imageUrl, 5, 1.5, 5, 4, 30);
+            await addImageToSlide(slide, imageUrl, 5.2, 1.5, 4.6, 3.9, 35);
+          } else if (templateConfig.imageStyle === 'full' && i > 0) {
+            const imageUrl = getUnsplashUrl(imageQuery + ',minimal', 1920, 1080);
+            await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 10);
           }
 
-          // Header bar
           slide.addShape(pres.ShapeType.rect, {
             x: 0, y: 0, w: 10, h: 1.2,
             fill: { color: cleanedDesign.accentColor },
             line: { type: 'none' },
           });
 
-          // Apply template decorative elements
+          const lightAccent = lightenColor(cleanedDesign.accentColor, 0.3);
+          slide.addShape(pres.ShapeType.rect, {
+            x: 0, y: 1.15, w: 10, h: 0.05,
+            fill: { color: lightAccent },
+            line: { type: 'none' },
+          });
+
           const contentLayout = templateConfig.contentLayout;
           contentLayout.decorativeElements.forEach(elem => {
             const pxToInch = (px: number) => px / 96;
@@ -322,7 +322,6 @@ export const generatePresentationAsBase64 = async (
             }
           });
 
-          // Title
           slide.addText(cleanText(slideData.title) ?? 'Slide Title', {
             x: 0.6, y: 0.3, w: 8.5, h: 0.6,
             fontSize: 36,
@@ -332,14 +331,14 @@ export const generatePresentationAsBase64 = async (
             fontFace: cleanedDesign.titleFont,
           });
 
-          // Content
           if (slideData.content && slideData.content.length > 0) {
+            const contentWidth = templateConfig.imageStyle === 'side' ? 4.5 : 8.8;
+            
             if (layoutKey === 'twocolumn') {
               const mid = Math.ceil(slideData.content.length / 2);
               const left = cleanTextArray(slideData.content.slice(0, mid));
               const right = cleanTextArray(slideData.content.slice(mid));
 
-              // Separator
               slide.addShape(pres.ShapeType.rect, {
                 x: 4.95, y: 1.8, w: 0.1, h: 3.5,
                 fill: { color: cleanedDesign.accentColor, transparency: 30 },
@@ -351,7 +350,7 @@ export const generatePresentationAsBase64 = async (
                   x: 0.6, y: 1.8, w: 4, h: 3.5,
                   fontSize: 16,
                   bullet: { type: 'number' },
-                  color: primaryTextColor,
+                  color: cleanedDesign.accentColor,
                   fontFace: cleanedDesign.bodyFont,
                   lineSpacing: 24,
                 });
@@ -362,17 +361,17 @@ export const generatePresentationAsBase64 = async (
                   x: 5.3, y: 1.8, w: 4, h: 3.5,
                   fontSize: 16,
                   bullet: { type: 'number' },
-                  color: primaryTextColor,
+                  color: cleanedDesign.accentColor,
                   fontFace: cleanedDesign.bodyFont,
                   lineSpacing: 24,
                 });
               }
             } else {
               slide.addText(cleanTextArray(slideData.content), {
-                x: 0.6, y: 1.8, w: 8.8, h: 3.5,
+                x: 0.6, y: 1.8, w: contentWidth, h: 3.5,
                 fontSize: 18,
                 bullet: { type: 'number' },
-                color: primaryTextColor,
+                color: cleanedDesign.accentColor,
                 fontFace: cleanedDesign.bodyFont,
                 lineSpacing: 26,
               });
@@ -382,13 +381,12 @@ export const generatePresentationAsBase64 = async (
         }
       }
 
-      // Add slide number
       slide.addText(`${i + 1}`, {
         x: 9.2, y: 5.2, w: 0.6, h: 0.3,
         fontSize: 10,
-        color: primaryTextColor,
+        color: cleanedDesign.accentColor,
         align: 'right',
-        transparency: 50,
+        bold: true,
       });
 
     } catch (err) {
@@ -396,6 +394,7 @@ export const generatePresentationAsBase64 = async (
     }
   }
 
+  console.log('✅ Generating PPTX...');
   const result = await pres.write({ outputType: 'base64' });
   if (typeof result !== 'string') {
     throw new Error('Failed to generate base64 string');

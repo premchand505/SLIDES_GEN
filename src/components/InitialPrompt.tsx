@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Send, Loader2, Paperclip, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import type { UserProfile } from './UserProfileSetup';
 
 interface InitialPromptProps {
   onSubmit: (input: string) => void;
@@ -14,34 +15,48 @@ interface InitialPromptProps {
 }
 
 const dummyTopics = [
-  'Renewable Energy',
-  'History of the Internet',
+  'History of Dubai',
+  'Climate Change Impact',
   'Machine Learning Basics',
+  'Renewable Energy',
+  'Space Exploration',
 ];
 
 export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
   const [input, setInput] = useState('');
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState<string | null>(null);
 
-  // ✅ FIXED: Properly load user name on mount
   useEffect(() => {
     const loadUserProfile = () => {
-      if (typeof window !== 'undefined') {
+      try {
         const stored = localStorage.getItem('user-profile');
         if (stored) {
-          try {
-            const profile = JSON.parse(stored);
-            if (profile.name) {
-              setUserName(profile.name);
-            }
-          } catch (error) {
-            console.error('Failed to parse user profile:', error);
+          const profile = JSON.parse(stored) as UserProfile;
+          if (profile.name) {
+            setUserName(profile.name);
           }
         }
+      } catch (error) {
+        console.error('Failed to parse user profile:', error);
       }
     };
     
     loadUserProfile();
+
+    // Listen for storage changes
+    const handleStorageChange = () => {
+      loadUserProfile();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically (for same-tab updates)
+    const interval = setInterval(loadUserProfile, 500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -72,7 +87,13 @@ export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
           <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-primary" />
         </div>
         <h2 className="text-2xl md:text-4xl font-bold mb-2">
-          {userName ? `Welcome back, ${userName}! 👋` : 'Welcome to SLIDES GEN! 👋'}
+          {userName ? (
+            <>
+              Welcome back, <span className="text-primary">{userName}</span>! 👋
+            </>
+          ) : (
+            'Welcome to SLIDES GEN! 👋'
+          )}
         </h2>
         <p className="text-sm md:text-lg text-muted-foreground px-4">
           Generate professional slides in seconds with AI
@@ -84,7 +105,7 @@ export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Describe your presentation... (e.g., 'Create 5 slides about climate change')"
+          placeholder="Describe your presentation topic... (e.g., 'Create slides about the history of artificial intelligence')"
           className={cn(
             "min-h-[120px] md:min-h-[150px] p-4 pr-24 md:pr-28 text-sm md:text-base",
             "bg-secondary resize-none",
@@ -140,17 +161,17 @@ export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
 
       {/* Features */}
       <div className="mt-8 md:mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 text-center">
-        <div className="p-4 rounded-lg bg-muted/50">
+        <div className="p-4 rounded-lg bg-muted/50 border">
           <div className="text-2xl mb-2">⚡</div>
           <h3 className="font-semibold text-sm mb-1">Lightning Fast</h3>
           <p className="text-xs text-muted-foreground">Generate slides in seconds</p>
         </div>
-        <div className="p-4 rounded-lg bg-muted/50">
+        <div className="p-4 rounded-lg bg-muted/50 border">
           <div className="text-2xl mb-2">🎨</div>
           <h3 className="font-semibold text-sm mb-1">5 Stunning Templates</h3>
           <p className="text-xs text-muted-foreground">Professional design patterns</p>
         </div>
-        <div className="p-4 rounded-lg bg-muted/50">
+        <div className="p-4 rounded-lg bg-muted/50 border">
           <div className="text-2xl mb-2">✨</div>
           <h3 className="font-semibold text-sm mb-1">AI Powered</h3>
           <p className="text-xs text-muted-foreground">Smart content + design generation</p>

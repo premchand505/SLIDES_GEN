@@ -1,10 +1,11 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { ChatHistorySidebar } from '@/components/ChatHistorySidebar';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { UserProfile } from '@/components/UserProfileSetup';
 
 interface AppShellProps {
   children: ReactNode;
@@ -12,6 +13,34 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load username from localStorage
+    const loadUserProfile = () => {
+      try {
+        const stored = localStorage.getItem('user-profile');
+        if (stored) {
+          const profile = JSON.parse(stored) as UserProfile;
+          if (profile.name) {
+            setUserName(profile.name);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+    };
+
+    loadUserProfile();
+
+    // Listen for storage changes (in case profile is updated)
+    const handleStorageChange = () => {
+      loadUserProfile();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white text-black relative">
@@ -61,8 +90,17 @@ export function AppShell({ children }: AppShellProps) {
             </h1>
           </div>
 
-          {/* Desktop spacing placeholder */}
-          <div className="w-10 hidden md:block" />
+          {/* User Profile Display */}
+          {userName && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-100 border border-neutral-200">
+              <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="w-3 h-3 md:w-4 md:h-4 text-primary" />
+              </div>
+              <span className="text-xs md:text-sm font-medium text-neutral-700 hidden sm:inline">
+                {userName}
+              </span>
+            </div>
+          )}
         </header>
 
         {/* Content */}
