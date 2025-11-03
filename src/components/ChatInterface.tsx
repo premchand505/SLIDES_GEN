@@ -10,7 +10,7 @@ import { useGeneration } from '@/hooks/useGeneration';
 export function ChatInterface() {
   const { messages: storeMessages, isLoading } = useChatStore();
   
-  // ✅ FIXED: Use store messages directly, no local state duplication
+  // ✅ Use store messages directly, no local state duplication
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // ✅ Use the shared generation hook

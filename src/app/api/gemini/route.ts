@@ -1,4 +1,4 @@
-// app/api/gemini/route.ts - FINAL STABLE VERSION (Unused import removed)
+// app/api/gemini/route.ts 
 import {
   GoogleGenerativeAI,
   GenerationConfig,
@@ -7,7 +7,7 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { PPTData, GeminiResponse } from "@/types";
-// === FIX: Removed unused 'SlideLayoutConfig' import ===
+
 import { selectTemplateFromTopic, DESIGN_TEMPLATES, getImageQuery, type DesignTemplate } from '@/lib/designSystem';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;

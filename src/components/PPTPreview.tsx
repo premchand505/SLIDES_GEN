@@ -115,7 +115,7 @@ export function PPTPreview() {
     );
   }
 
-  // === ⬇️ FIX: The fallback is now 'minimalist' ===
+  // === ⬇️  The fallback is now 'minimalist' ===
   const templateName = (pptData?.template as DesignTemplate) || 'minimalist';
 
   return (

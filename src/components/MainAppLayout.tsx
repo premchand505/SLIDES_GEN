@@ -13,13 +13,14 @@ import { Button } from '@/components/ui/button';
 import { Plus, Home, Presentation } from 'lucide-react';
 import { AppShell } from '@/components/Appshell';
 import { useGeneration } from '@/hooks/useGeneration';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+// === ⬇️ MODIFICATION: Import SheetDescription ===
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
+// === ⬆️ END MODIFICATION ===
 
 const DownloadButton = dynamic(
   () => import('@/components/DownloadButton').then(mod => mod.DownloadButton),
   { ssr: false, loading: () => <div className="h-9 w-28 rounded-md bg-secondary animate-pulse" /> }
 );
-
 export function MainAppLayout() {
   const {
     pptData,
@@ -28,28 +29,22 @@ export function MainAppLayout() {
     createNewSession,
     isLoading,
   } = useChatStore();
-
   const { handleGenerate } = useGeneration();
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(true);
-
   const hasData = (pptData?.slides?.length ?? 0) > 0;
   const hasMessages = messages.length > 0;
-
   useEffect(() => {
     if (!currentSessionId && !isLoading) {
       createNewSession();
     }
   }, [currentSessionId, createNewSession, isLoading]);
-
   const handleProfileComplete = () => {
     setShowProfileSetup(false);
   };
-
   const handleFirstSubmit = (topic: string) => {
     const trimmed = topic.trim();
     if (!trimmed || isLoading) return;
-
     const store = useChatStore.getState();
     let sessionId = store.currentSessionId;
     if (!sessionId) {
@@ -63,7 +58,6 @@ export function MainAppLayout() {
     setMobilePreviewOpen(false);
     createNewSession();
   };
-
   return (
     <>
       {/* User Profile Setup Modal */}
@@ -135,6 +129,11 @@ export function MainAppLayout() {
                               <SheetTitle>Preview</SheetTitle>
                               <DownloadButton />
                             </div>
+                            {/* === ⬇️ MODIFICATION: Added accessible description === */}
+                            <SheetDescription className="sr-only">
+                              A preview of the generated PowerPoint slides. You can scroll through the slides here.
+                            </SheetDescription>
+                            {/* === ⬆️ END MODIFICATION === */}
                           </SheetHeader>
                           <div className="flex-1 overflow-hidden">
                             <PPTPreview />
@@ -164,7 +163,7 @@ export function MainAppLayout() {
                   <DownloadButton />
                 </header>
                 <div className="flex-1 overflow-hidden">
-                  <PPTPreview />
+                   <PPTPreview />
                 </div>
               </div>
             </motion.div>

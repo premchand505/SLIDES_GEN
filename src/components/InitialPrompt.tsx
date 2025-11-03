@@ -159,24 +159,7 @@ export function InitialPrompt({ onSubmit, isLoading }: InitialPromptProps) {
         </div>
       </div>
 
-      {/* Features */}
-      <div className="mt-8 md:mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 text-center">
-        <div className="p-4 rounded-lg bg-muted/50 border">
-          <div className="text-2xl mb-2">⚡</div>
-          <h3 className="font-semibold text-sm mb-1">Lightning Fast</h3>
-          <p className="text-xs text-muted-foreground">Generate slides in seconds</p>
-        </div>
-        <div className="p-4 rounded-lg bg-muted/50 border">
-          <div className="text-2xl mb-2">🎨</div>
-          <h3 className="font-semibold text-sm mb-1">5 Stunning Templates</h3>
-          <p className="text-xs text-muted-foreground">Professional design patterns</p>
-        </div>
-        <div className="p-4 rounded-lg bg-muted/50 border">
-          <div className="text-2xl mb-2">✨</div>
-          <h3 className="font-semibold text-sm mb-1">AI Powered</h3>
-          <p className="text-xs text-muted-foreground">Smart content + design generation</p>
-        </div>
-      </div>
+      
     </motion.div>
   );
 }
