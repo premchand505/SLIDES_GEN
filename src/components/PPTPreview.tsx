@@ -1,3 +1,4 @@
+// components/PPTPreview.tsx
 'use client';
 
 import { useChatStore } from '@/store/useChatStore';
@@ -12,6 +13,7 @@ import {
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { DesignTemplate } from '@/lib/designSystem';
 
 export function PPTPreview() {
   const { pptData, isLoading } = useChatStore();
@@ -47,7 +49,6 @@ export function PPTPreview() {
     };
   }, [api]);
 
-  // Keyboard navigation (desktop only)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!api || window.innerWidth < 768) return;
@@ -65,23 +66,18 @@ export function PPTPreview() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [api]);
 
-  // Mouse wheel navigation (desktop only)
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !api || window.innerWidth < 768) return;
 
     const handleWheel = (e: WheelEvent) => {
       if (wheelingRef.current) return;
-
       const delta = e.deltaY;
-      
       if (Math.abs(delta) < 10) return;
-
       e.preventDefault();
       e.stopPropagation();
-      
       wheelingRef.current = true;
-
+   
       if (delta > 0) {
         api.scrollNext();
       } else {
@@ -100,7 +96,6 @@ export function PPTPreview() {
   const canScrollPrev = current > 0;
   const canScrollNext = current < count - 1;
 
-  // Loading State
   if (isLoading && slides.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-white p-4">
@@ -110,7 +105,6 @@ export function PPTPreview() {
     );
   }
 
-  // Empty State
   if (slides.length === 0) {
     return (
       <div className="flex items-center justify-center h-full p-4">
@@ -120,6 +114,9 @@ export function PPTPreview() {
       </div>
     );
   }
+
+  // === ⬇️ FIX: The fallback is now 'minimalist' ===
+  const templateName = (pptData?.template as DesignTemplate) || 'minimalist';
 
   return (
     <div 
@@ -143,7 +140,7 @@ export function PPTPreview() {
         <CarouselContent className="h-full">
           {slides.map((slide, index) => (
             <CarouselItem
-              key={index}
+              key={slide.title + index}
               className="h-full flex items-center justify-center p-4 md:p-8"
             >
               <div className="w-full max-w-4xl">
@@ -151,6 +148,7 @@ export function PPTPreview() {
                   slide={slide} 
                   slideNumber={index + 1}
                   globalTheme={pptData?.globalTheme}
+                  templateName={templateName}
                 />
               </div>
             </CarouselItem>
@@ -173,7 +171,6 @@ export function PPTPreview() {
           <ChevronUp className="h-4 w-4 md:h-5 md:w-5" />
         </Button>
         
-        {/* Slide Counter */}
         <div className="py-1.5 md:py-2 px-2 md:px-3 text-center bg-background/90 backdrop-blur-sm rounded-full border shadow-sm text-xs md:text-sm font-medium min-w-[50px] md:min-w-[60px]">
           {current + 1} / {count}
         </div>
@@ -192,14 +189,12 @@ export function PPTPreview() {
         </Button>
       </div>
 
-      {/* Hint Text - Desktop only */}
       {count > 1 && (
         <div className="hidden md:block absolute bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-10 text-xs text-white animate-pulse">
           Use arrow keys or scroll to navigate
         </div>
       )}
 
-      {/* Mobile Swipe Hint */}
       {count > 1 && (
         <div className="md:hidden absolute bottom-4 left-1/2 -translate-x-1/2 z-10 text-xs text-white animate-pulse">
           Swipe to navigate

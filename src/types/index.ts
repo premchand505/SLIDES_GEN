@@ -1,4 +1,5 @@
 // types/index.ts
+
 /**
  * Represents the design styling for a slide
  */
@@ -10,12 +11,10 @@ export type SlideDesign = {
   accentColor: string;
   imageQuery?: string; // For Unsplash image search
 };
-
 /**
  * Strict layout types only
  */
 export type SlideLayout = 'title' | 'content' | 'section' | 'twocolumn';
-
 /**
  * Represents the structure of a single PowerPoint slide.
  */
@@ -24,6 +23,7 @@ export type SlideContent = {
   title: string;
   subtitle?: string;
   content?: string[];
+  imageQuery?: string;
   design: SlideDesign;
 };
 
@@ -46,7 +46,6 @@ export type PPTData = {
   globalTheme?: SlideDesign;
   template?: string; // Template name for consistency
 };
-
 /**
  * Represents a single message in the chat interface.
  */
@@ -57,7 +56,6 @@ export type ChatMessage = {
   timestamp: Date;
   thinkingStep?: ThinkingStep;
 };
-
 /**
  * Defines the possible actions our AI can return.
  */
@@ -67,13 +65,15 @@ export type AIAction = 'create' | 'edit' | 'add' | 'delete' | 'reorder';
  * The expected JSON response structure from the Gemini API.
  */
 export type GeminiResponse = {
+  // === ⬇️ MODIFICATION: Added title field ===
+  title?: string;
+  // === ⬆️ END MODIFICATION ===
   action: AIAction;
   slides: SlideContent[];
   reasoning?: string;
   globalTheme?: SlideDesign;
   template?: string;
 };
-
 /**
  * Represents the state of our chat application.
  */
@@ -94,7 +94,6 @@ export type ChatActions = {
   setError: (error: string | null) => void;
   clearChat: () => void;
 };
-
 /**
  * Combined type for the Zustand store.
  */

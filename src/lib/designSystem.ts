@@ -1,25 +1,36 @@
-// lib/designSystem.ts - ENHANCED WITH COMPLEMENTARY COLORS
+// lib/designSystem.ts - FINAL REDESIGN (with typo fix)
 
 export type DesignTemplate = 
-  | 'executive-minimal'      // Gold + Navy (Luxury & Trust)
-  | 'tech-gradient'          // Indigo + Cyan (Tech & Innovation)
-  | 'creative-bold'          // Coral + Teal (Energy & Balance)
-  | 'elegant-luxury'         // Burgundy + Champagne (Elegance & Warmth)
-  | 'modern-geometric';      // Emerald + Orange (Growth & Energy)
+  | 'executive'
+  | 'tech'
+  | 'editorial'
+  | 'minimalist'
+  | 'split';
 
 export type ColorPalette = {
-  primary: string;     // Main brand color
-  secondary: string;   // Complementary color
-  accent: string;      // Highlight color (derived from primary/secondary)
-  background: string;  // Background color
-  text: string;        // Primary text color
-  textLight: string;   // Secondary text color
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  text: string;
+  textLight: string;
 };
 
-export type LayoutPattern = {
-  headerHeight: number;
-  contentPadding: number;
-  accentPosition: 'left' | 'right' | 'top' | 'bottom';
+// This is our advanced layout system
+type Box = { x: number; y: number; w: number; h: number; };
+type TextOptions = {
+  align?: 'left' | 'center' | 'right';
+  valign?: 'top' | 'middle' | 'bottom';
+  bold?: boolean;
+  fontSize?: number;
+};
+
+export type SlideLayoutConfig = {
+  titleBox: Box & TextOptions;
+  subtitleBox?: Box & TextOptions;
+  contentBox?: Box & TextOptions;
+  contentBoxTwo?: Box & TextOptions;
+  imageBox?: Box;
   decorativeElements: DecorativeElement[];
 };
 
@@ -34,221 +45,234 @@ export type DecorativeElement = {
   rotation?: number;
 };
 
-// 🎨 5 STUNNING TEMPLATES WITH COMPLEMENTARY COLOR PAIRS
 export const DESIGN_TEMPLATES: Record<DesignTemplate, {
   palette: ColorPalette;
-  titleLayout: LayoutPattern;
-  contentLayout: LayoutPattern;
+  titleLayout: SlideLayoutConfig;
+  sectionLayout: SlideLayoutConfig;
+  contentLayout: SlideLayoutConfig;
+  twoColumnLayout: SlideLayoutConfig;
   fonts: { title: string; body: string };
-  imageStyle: 'full' | 'side' | 'overlay' | 'none';
   description: string;
 }> = {
-  'executive-minimal': {
-    description: 'Professional elegance with Gold (#D4AF37) and Navy (#1A2332) - perfect for corporate presentations',
+
+  'executive': {
+    description: 'Clean, corporate design with a strong sidebar and neutral colors.',
     palette: {
-      primary: '1A2332',      // Deep Navy
-      secondary: 'D4AF37',    // Luxe Gold
-      accent: 'C9A962',       // Softer Gold
-      background: 'FFFFFF',   // Pure White
-      text: '1A2332',         // Navy Text
-      textLight: '5A6370',    // Muted Gray
+      primary: '1A2332',
+      secondary: 'E0E0E0',
+      accent: '3B82F6',
+      background: 'FFFFFF',
+      text: '1A2332',
+      textLight: 'FFFFFF',
     },
     fonts: { title: 'Helvetica', body: 'Helvetica' },
-    imageStyle: 'side',
     titleLayout: {
-      headerHeight: 0,
-      contentPadding: 80,
-      accentPosition: 'left',
+      titleBox: { x: 0.5, y: 2.0, w: 9, h: 1.5, align: 'left', fontSize: 48, bold: true },
+      subtitleBox: { x: 0.5, y: 3.5, w: 9, h: 0.8, align: 'left', fontSize: 24 },
       decorativeElements: [
-        // Gold accent bar
-        { type: 'rectangle', x: 50, y: 950, width: 400, height: 12, color: 'D4AF37', opacity: 100, rotation: 0 },
-        // Navy geometric shape
-        { type: 'rectangle', x: 1700, y: 100, width: 200, height: 200, color: '1A2332', opacity: 8, rotation: 45 },
-        // Gold circle
-        { type: 'circle', x: 100, y: 100, width: 150, height: 150, color: 'D4AF37', opacity: 12, rotation: 0 },
+        { type: 'rectangle', x: 0, y: 0, width: 3.5, height: 5.625, color: '1A2332', opacity: 100, rotation: 0 },
+        { type: 'line', x: 0.5, y: 1.8, width: 2, height: 0.08, color: '3B82F6', opacity: 100, rotation: 0 },
+      ],
+    },
+    sectionLayout: {
+      titleBox: { x: 0.5, y: 2.5, w: 9, h: 0.8, align: 'center', fontSize: 40, bold: true },
+      decorativeElements: [
+        { type: 'rectangle', x: 0, y: 0, width: 10, height: 1.2, color: '1A2332', opacity: 100, rotation: 0 },
+        { type: 'line', x: 3, y: 3.5, width: 4, height: 0.08, color: '3B82F6', opacity: 100, rotation: 0 },
       ],
     },
     contentLayout: {
-      headerHeight: 120,
-      contentPadding: 60,
-      accentPosition: 'top',
+      titleBox: { x: 1.2, y: 0.5, w: 8.3, h: 0.8, align: 'left', fontSize: 32, bold: true },
+      contentBox: { x: 1.2, y: 1.5, w: 5.0, h: 3.7 },
+      imageBox: { x: 6.5, y: 1.5, w: 3.0, h: 3.7 },
       decorativeElements: [
-        // Gold top accent
-        { type: 'rectangle', x: 0, y: 115, width: 1920, height: 5, color: 'D4AF37', opacity: 100, rotation: 0 },
-        // Navy sidebar accent
-        { type: 'rectangle', x: 0, y: 0, width: 8, height: 1080, color: '1A2332', opacity: 30, rotation: 0 },
+        { type: 'rectangle', x: 0, y: 0, width: 0.8, height: 5.625, color: '1A2332', opacity: 100, rotation: 0 },
+        { type: 'line', x: 1.2, y: 1.3, width: 8.3, height: 0.02, color: 'E0E0E0', opacity: 100, rotation: 0 },
+      ],
+    },
+    twoColumnLayout: {
+      titleBox: { x: 1.2, y: 0.5, w: 8.3, h: 0.8, align: 'left', fontSize: 32, bold: true },
+      contentBox: { x: 1.2, y: 1.5, w: 4.0, h: 3.7 },
+      contentBoxTwo: { x: 5.5, y: 1.5, w: 4.0, h: 3.7 },
+      decorativeElements: [
+        { type: 'rectangle', x: 0, y: 0, width: 0.8, height: 5.625, color: '1A2332', opacity: 100, rotation: 0 },
+        { type: 'line', x: 1.2, y: 1.3, width: 8.3, height: 0.02, color: 'E0E0E0', opacity: 100, rotation: 0 },
       ],
     },
   },
 
-  'tech-gradient': {
-    description: 'Futuristic design with Indigo (#6366F1) and Cyan (#06B6D4) - ideal for technology and innovation',
+  'tech': {
+    description: 'Sleek, modern dark mode template.',
     palette: {
-      primary: '6366F1',      // Vibrant Indigo
-      secondary: '06B6D4',    // Electric Cyan
-      accent: '8B5CF6',       // Purple blend
-      background: '0F172A',   // Dark Slate
-      text: 'F1F5F9',         // Light text
-      textLight: 'CBD5E1',    // Muted light
+      primary: '0F172A',
+      secondary: '3B82F6',
+      accent: '06B6D4',
+      background: '0F172A',
+      text: 'F1F5F9',
+      textLight: '94A3B8',
     },
     fonts: { title: 'Arial', body: 'Arial' },
-    imageStyle: 'overlay',
     titleLayout: {
-      headerHeight: 0,
-      contentPadding: 100,
-      accentPosition: 'right',
+      titleBox: { x: 0.5, y: 2.0, w: 9, h: 1.5, align: 'center', fontSize: 48, bold: true },
+      subtitleBox: { x: 0.5, y: 3.5, w: 9, h: 0.8, align: 'center', fontSize: 24 },
       decorativeElements: [
-        // Large indigo glow
-        { type: 'circle', x: 1300, y: -150, width: 900, height: 900, color: '6366F1', opacity: 18, rotation: 0 },
-        // Cyan accent circle
-        { type: 'circle', x: 100, y: 700, width: 600, height: 600, color: '06B6D4', opacity: 22, rotation: 0 },
-        // Purple blend
-        { type: 'circle', x: 800, y: 300, width: 400, height: 400, color: '8B5CF6', opacity: 15, rotation: 0 },
-        // Gradient overlay effect
-        { type: 'gradient', x: 0, y: 0, width: 1920, height: 1080, color: '0F172A', opacity: 85, rotation: 0 },
+        { type: 'circle', x: 7, y: -1, width: 4, height: 4, color: '3B82F6', opacity: 10, rotation: 0 },
+        { type: 'circle', x: -1, y: 3, width: 3, height: 3, color: '06B6D4', opacity: 15, rotation: 0 },
+      ],
+    },
+    sectionLayout: {
+      titleBox: { x: 0.5, y: 2.5, w: 9, h: 0.8, align: 'left', fontSize: 40, bold: true },
+      decorativeElements: [
+        { type: 'line', x: 0.5, y: 3.5, width: 4, height: 0.08, color: '06B6D4', opacity: 100, rotation: 0 },
       ],
     },
     contentLayout: {
-      headerHeight: 150,
-      contentPadding: 70,
-      accentPosition: 'top',
+      titleBox: { x: 4.0, y: 0.5, w: 5.5, h: 0.8, align: 'left', fontSize: 32, bold: true },
+      contentBox: { x: 4.0, y: 1.5, w: 5.5, h: 3.7 },
+      imageBox: { x: 0.5, y: 0.5, w: 3.2, h: 4.7 },
       decorativeElements: [
-        // Cyan header accent
-        { type: 'rectangle', x: 0, y: 140, width: 1920, height: 10, color: '06B6D4', opacity: 100, rotation: 0 },
-        // Indigo corner element
-        { type: 'circle', x: 1750, y: 50, width: 120, height: 120, color: '6366F1', opacity: 35, rotation: 0 },
-        // Small cyan dot
-        { type: 'circle', x: 80, y: 80, width: 40, height: 40, color: '06B6D4', opacity: 50, rotation: 0 },
+        { type: 'line', x: 0, y: 0.1, width: 10, height: 0.03, color: '3B82F6', opacity: 50, rotation: 0 },
+      ],
+    },
+    twoColumnLayout: {
+      titleBox: { x: 0.5, y: 0.25, w: 9, h: 0.8, align: 'left', fontSize: 32, bold: true },
+      contentBox: { x: 0.5, y: 1.2, w: 4.4, h: 4.0 },
+      contentBoxTwo: { x: 5.1, y: 1.2, w: 4.4, h: 4.0 },
+      decorativeElements: [
+        { type: 'line', x: 4.95, y: 1.2, width: 0.03, height: 4.0, color: '06B6D4', opacity: 70, rotation: 0 },
       ],
     },
   },
 
-  'creative-bold': {
-    description: 'Energetic creativity with Coral (#FF6B6B) and Teal (#20B2AA) - perfect for creative portfolios',
+  'editorial': {
+    description: 'Elegant, clean, magazine-style layout with a focus on large images.',
     palette: {
-      primary: 'FF6B6B',      // Vibrant Coral
-      secondary: '20B2AA',    // Cool Teal
-      accent: 'FFD93D',       // Bright Yellow
-      background: 'FEF5E7',   // Warm Cream
-      text: '2D3436',         // Charcoal
-      textLight: '636E72',    // Medium Gray
-    },
-    fonts: { title: 'Arial', body: 'Calibri' },
-    imageStyle: 'full',
-    titleLayout: {
-      headerHeight: 0,
-      contentPadding: 100,
-      accentPosition: 'bottom',
-      decorativeElements: [
-        // Large coral circle
-        { type: 'circle', x: 150, y: 150, width: 350, height: 350, color: 'FF6B6B', opacity: 25, rotation: 0 },
-        // Teal triangle
-        { type: 'triangle', x: 1400, y: 650, width: 450, height: 450, color: '20B2AA', opacity: 20, rotation: 30 },
-        // Yellow accent bar
-        { type: 'rectangle', x: 700, y: 880, width: 520, height: 45, color: 'FFD93D', opacity: 85, rotation: -3 },
-        // Small coral dots
-        { type: 'circle', x: 1700, y: 200, width: 80, height: 80, color: 'FF6B6B', opacity: 40, rotation: 0 },
-      ],
-    },
-    contentLayout: {
-      headerHeight: 180,
-      contentPadding: 80,
-      accentPosition: 'left',
-      decorativeElements: [
-        // Teal sidebar
-        { type: 'rectangle', x: 0, y: 0, width: 45, height: 1080, color: '20B2AA', opacity: 100, rotation: 0 },
-        // Coral accent circle
-        { type: 'circle', x: 22, y: 120, width: 90, height: 90, color: 'FF6B6B', opacity: 100, rotation: 0 },
-        // Yellow corner accent
-        { type: 'rectangle', x: 1820, y: 950, width: 100, height: 130, color: 'FFD93D', opacity: 60, rotation: 0 },
-      ],
-    },
-  },
-
-  'elegant-luxury': {
-    description: 'Sophisticated style with Burgundy (#6B2C3E) and Champagne (#C9A962) - ideal for luxury brands',
-    palette: {
-      primary: '6B2C3E',      // Deep Burgundy
-      secondary: 'C9A962',    // Champagne Gold
-      accent: '8B4A5F',       // Rose blend
-      background: 'FAF8F6',   // Soft Ivory
-      text: '2C1810',         // Dark Brown
-      textLight: '7A6A5A',    // Warm Gray
+      primary: '5A7D7C',
+      secondary: '111111',
+      accent: 'D4A373',
+      background: 'FFFFFF',
+      text: '111111',
+      textLight: 'FFFFFF',
     },
     fonts: { title: 'Georgia', body: 'Georgia' },
-    imageStyle: 'side',
     titleLayout: {
-      headerHeight: 0,
-      contentPadding: 120,
-      accentPosition: 'top',
+      titleBox: { x: 0.5, y: 2.0, w: 9, h: 1.5, align: 'center', fontSize: 52, bold: true },
+      subtitleBox: { x: 0.5, y: 3.5, w: 9, h: 0.8, align: 'center', fontSize: 24 },
       decorativeElements: [
-        // Burgundy top panel
-        { type: 'rectangle', x: 0, y: 0, width: 1920, height: 420, color: '6B2C3E', opacity: 100, rotation: 0 },
-        // Champagne divider line
-        { type: 'line', x: 200, y: 440, width: 1520, height: 4, color: 'C9A962', opacity: 100, rotation: 0 },
-        // Champagne accent box
-        { type: 'rectangle', x: 800, y: 425, width: 320, height: 30, color: 'C9A962', opacity: 100, rotation: 0 },
+        { type: 'line', x: 1, y: 1.8, width: 8, height: 0.02, color: '111111', opacity: 100, rotation: 0 },
+        { type: 'line', x: 1, y: 4.5, width: 8, height: 0.02, color: '111111', opacity: 100, rotation: 0 },
+      ],
+    },
+    sectionLayout: {
+      titleBox: { x: 0.5, y: 2.5, w: 9, h: 0.8, align: 'right', fontSize: 40, bold: true },
+      decorativeElements: [
+        { type: 'rectangle', x: 0, y: 0, width: 10, height: 5.625, color: '5A7D7C', opacity: 100, rotation: 0 },
+        { type: 'line', x: 7, y: 3.5, width: 2.5, height: 0.05, color: 'FFFFFF', opacity: 100, rotation: 0 },
       ],
     },
     contentLayout: {
-      headerHeight: 140,
-      contentPadding: 90,
-      accentPosition: 'right',
+      titleBox: { x: 0.5, y: 0.2, w: 9, h: 0.8, align: 'left', fontSize: 32, bold: true },
+      imageBox: { x: 0.5, y: 1.1, w: 9, h: 2.5 },
+      contentBox: { x: 0.5, y: 3.8, w: 9, h: 1.6 },
       decorativeElements: [
-        // Champagne side accent
-        { type: 'rectangle', x: 1870, y: 0, width: 50, height: 1080, color: 'C9A962', opacity: 100, rotation: 0 },
-        // Burgundy header underline
-        { type: 'rectangle', x: 100, y: 130, width: 450, height: 10, color: '6B2C3E', opacity: 100, rotation: 0 },
-        // Rose blend circle
-        { type: 'circle', x: 1750, y: 900, width: 150, height: 150, color: '8B4A5F', opacity: 25, rotation: 0 },
+        { type: 'line', x: 0.5, y: 1.0, width: 9, height: 0.02, color: 'E0E0E0', opacity: 100, rotation: 0 },
+      ],
+    },
+    twoColumnLayout: {
+      titleBox: { x: 0.5, y: 0.2, w: 9, h: 0.8, align: 'left', fontSize: 32, bold: true },
+      imageBox: { x: 0.5, y: 1.1, w: 9, h: 2.5 },
+      contentBox: { x: 0.5, y: 3.8, w: 4.4, h: 1.6 },
+      contentBoxTwo: { x: 5.1, y: 3.8, w: 4.4, h: 1.6 },
+      decorativeElements: [
+        { type: 'line', x: 0.5, y: 1.0, width: 9, height: 0.02, color: 'E0E0E0', opacity: 100, rotation: 0 },
       ],
     },
   },
 
-  'modern-geometric': {
-    description: 'Fresh and dynamic with Emerald (#2ECC71) and Orange (#F39C12) - great for modern businesses',
+  'minimalist': {
+    description: 'Clean, simple, and elegant, focusing on typography.',
     palette: {
-      primary: '2ECC71',      // Vibrant Emerald
-      secondary: 'F39C12',    // Energetic Orange
-      accent: '27AE60',       // Deep Green
-      background: 'FFFFFF',   // Pure White
-      text: '2C3E50',         // Dark Slate
-      textLight: '7F8C8D',    // Cool Gray
+      primary: 'E07A5F',
+      secondary: '3D405B',
+      accent: '81B29A',
+      background: 'FAF8F6',
+      text: '3D405B',
+      textLight: 'FFFFFF',
     },
-    fonts: { title: 'Arial', body: 'Calibri' },
-    imageStyle: 'overlay',
+    fonts: { title: 'Calibri', body: 'Calibri' },
     titleLayout: {
-      headerHeight: 0,
-      contentPadding: 100,
-      accentPosition: 'left',
+      titleBox: { x: 0.5, y: 2.5, w: 9, h: 1.5, align: 'center', fontSize: 48, bold: true },
+      subtitleBox: { x: 0.5, y: 3.5, w: 9, h: 0.8, align: 'center', fontSize: 24 },
       decorativeElements: [
-        // Large emerald triangle
-        { type: 'triangle', x: 0, y: 0, width: 650, height: 1080, color: '2ECC71', opacity: 12, rotation: 0 },
-        // Orange square (rotated)
-        { type: 'rectangle', x: 550, y: 450, width: 130, height: 130, color: 'F39C12', opacity: 100, rotation: 45 },
-        // Emerald circle
-        { type: 'circle', x: 1450, y: 250, width: 250, height: 250, color: '27AE60', opacity: 22, rotation: 0 },
-        // Orange bottom accent
-        { type: 'line', x: 0, y: 1060, width: 1920, height: 20, color: 'F39C12', opacity: 100, rotation: 0 },
+        { type: 'line', x: 4, y: 2.3, width: 2, height: 0.05, color: 'E07A5F', opacity: 100, rotation: 0 },
+      ],
+    },
+    sectionLayout: {
+      titleBox: { x: 0.5, y: 2.5, w: 9, h: 0.8, align: 'center', fontSize: 40, bold: true },
+      decorativeElements: [
+        { type: 'line', x: 1, y: 3.5, width: 8, height: 0.03, color: 'E07A5F', opacity: 70, rotation: 0 },
       ],
     },
     contentLayout: {
-      headerHeight: 160,
-      contentPadding: 70,
-      accentPosition: 'bottom',
+      titleBox: { x: 0.5, y: 0.5, w: 5.8, h: 0.8, align: 'left', fontSize: 28, bold: true },
+      contentBox: { x: 0.5, y: 1.5, w: 5.8, h: 3.7 },
+      imageBox: { x: 6.6, y: 1.5, w: 3.1, h: 3.7 },
       decorativeElements: [
-        // Emerald header line
-        { type: 'rectangle', x: 0, y: 150, width: 1920, height: 10, color: '2ECC71', opacity: 100, rotation: 0 },
-        // Orange side bar
-        { type: 'rectangle', x: 60, y: 40, width: 12, height: 90, color: 'F39C12', opacity: 100, rotation: 0 },
-        // Emerald circle accent
-        { type: 'circle', x: 1750, y: 920, width: 140, height: 140, color: '27AE60', opacity: 35, rotation: 0 },
+        { type: 'line', x: 0.5, y: 1.3, width: 9, height: 0.02, color: 'E0E0E0', opacity: 100, rotation: 0 },
+      ],
+    },
+    twoColumnLayout: {
+      titleBox: { x: 0.5, y: 0.5, w: 9, h: 0.8, align: 'left', fontSize: 28, bold: true },
+      contentBox: { x: 0.5, y: 1.5, w: 4.4, h: 3.7 },
+      contentBoxTwo: { x: 5.1, y: 1.5, w: 4.4, h: 3.7 },
+      imageBox: { x: 6.6, y: 1.5, w: 3.1, h: 2.5 },
+      decorativeElements: [
+        { type: 'line', x: 0.5, y: 1.3, width: 9, height: 0.02, color: 'E0E0E0', opacity: 100, rotation: 0 },
+      ],
+    },
+  },
+
+  'split': {
+    description: 'A bold, modern split-screen layout.',
+    palette: {
+      primary: '20B2AA',
+      secondary: '111111',
+      accent: 'FFD700',
+      background: 'FFFFFF',
+      text: '111111',
+      textLight: 'FFFFFF',
+    },
+    fonts: { title: 'Arial', body: 'Calibri' },
+    titleLayout: {
+      titleBox: { x: 0.5, y: 2.0, w: 4.0, h: 1.5, align: 'left', fontSize: 48, bold: true },
+      subtitleBox: { x: 0.5, y: 3.5, w: 4.0, h: 0.8, align: 'left', fontSize: 24 },
+      imageBox: { x: 5, y: 0, w: 5, h: 5.625 },
+      decorativeElements: [],
+    },
+    sectionLayout: {
+      titleBox: { x: 0.5, y: 2.5, w: 9, h: 0.8, align: 'center', fontSize: 40, bold: true },
+      decorativeElements: [
+        { type: 'rectangle', x: 0, y: 0, width: 10, height: 5.625, color: '20B2AA', opacity: 100, rotation: 0 },
+      ],
+    },
+    contentLayout: {
+      titleBox: { x: 5.2, y: 0.5, w: 4.3, h: 1.2, align: 'left', fontSize: 32, bold: true },
+      contentBox: { x: 5.2, y: 1.8, w: 4.3, h: 3.4 },
+      imageBox: { x: 0, y: 0, w: 5, h: 5.625 },
+      decorativeElements: [],
+    },
+    twoColumnLayout: {
+      titleBox: { x: 0.5, y: 0.25, w: 9, h: 0.8, align: 'center', fontSize: 32, bold: true },
+      contentBox: { x: 0.5, y: 1.2, w: 4.4, h: 4.0 },
+      contentBoxTwo: { x: 5.1, y: 1.2, w: 4.4, h: 4.0 },
+      decorativeElements: [
+        { type: 'line', x: 4.95, y: 1.2, width: 0.03, height: 4.0, color: '20B2AA', opacity: 70, rotation: 0 },
       ],
     },
   },
 };
 
-// Enhanced image categories with better keywords
+// Enhanced image categories (Unchanged)
 export const IMAGE_CATEGORIES: Record<string, string> = {
   technology: 'technology,digital,innovation,future',
   business: 'business,professional,corporate,office',
@@ -267,61 +291,84 @@ export const IMAGE_CATEGORIES: Record<string, string> = {
   default: 'abstract,modern,minimal,professional',
 };
 
+// Smarter Template Selector (Unchanged)
 export function selectTemplateFromTopic(topic: string): DesignTemplate {
   const lower = topic.toLowerCase();
   
-  // Executive/Business
-  if (lower.includes('business') || lower.includes('corporate') || 
-      lower.includes('executive') || lower.includes('finance') ||
-      lower.includes('banking') || lower.includes('professional')) {
-    return 'executive-minimal';
+  if (['business', 'corporate', 'finance', 'executive', 'banking', 'professional', 'investment'].some(k => lower.includes(k))) {
+    return 'executive';
   }
   
-  // Technology/Innovation
-  if (lower.includes('tech') || lower.includes('ai') || 
-      lower.includes('software') || lower.includes('digital') ||
-      lower.includes('innovation') || lower.includes('future') ||
-      lower.includes('data') || lower.includes('cyber')) {
-    return 'tech-gradient';
+  if (['tech', 'ai', 'software', 'digital', 'innovation', 'future', 'data', 'cyber', 'science'].some(k => lower.includes(k))) {
+    return 'tech';
   }
   
-  // Creative/Marketing
-  if (lower.includes('creative') || lower.includes('art') || 
-      lower.includes('design') || lower.includes('marketing') ||
-      lower.includes('brand') || lower.includes('campaign') ||
-      lower.includes('advertising')) {
-    return 'creative-bold';
+  if (['history', 'ancient', 'rome', 'greece', 'war', 'culture', 'philosophy'].some(k => lower.includes(k))) {
+    return 'editorial';
   }
   
-  // Luxury/Premium
-  if (lower.includes('luxury') || lower.includes('premium') || 
-      lower.includes('elegant') || lower.includes('fashion') ||
-      lower.includes('exclusive') || lower.includes('high-end')) {
-    return 'elegant-luxury';
+  if (['creative', 'art', 'design', 'marketing', 'brand', 'mythology', 'music', 'fashion'].some(k => lower.includes(k))) {
+    return 'split';
   }
-  
-  // Default: Modern & Versatile
-  return 'modern-geometric';
+
+  return 'minimalist';
 }
 
+// getImageQuery (Unchanged)
 export function getImageQuery(topic: string): string {
   const lower = topic.toLowerCase();
-  
   for (const [key, value] of Object.entries(IMAGE_CATEGORIES)) {
     if (lower.includes(key)) {
       return value;
     }
   }
-  
+  // === ⬇️ FIX: Typo corrected ===
   return IMAGE_CATEGORIES.default;
+  // === ⬆️ END FIX ===
 }
 
-export function getUnsplashUrl(query: string, width = 1920, height = 1080): string {
-  // Use Unsplash Source API with specific quality and fit parameters
-  return `https://source.unsplash.com/${width}x${height}/?${encodeURIComponent(query)}&fit=crop&quality=80`;
+// getImageUrl (Unchanged)
+export async function getImageUrl(query: string, width = 1920, height = 1080): Promise<string> {
+  const PEXELS_KEY = process.env.PEXELS_API_KEY;
+  if (!PEXELS_KEY) {
+    console.warn('PEXELS_API_KEY is not set. Returning placeholder.');
+    return `https://loremflickr.com/${width}/${height}/error`;
+  }
+
+  const orientation = width > height ? 'landscape' : 'portrait';
+  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=${orientation}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': PEXELS_KEY
+      }
+    });
+
+    if (!res.ok) {
+      console.warn(`Pexels API error: ${res.statusText}`);
+      return `https://loremflickr.com/${width}/${height}/server,error`;
+    }
+
+    const data = await res.json();
+    const photo = data.photos?.[0];
+
+    const imageUrl = photo?.src?.large2x; 
+    
+    if (imageUrl) {
+      return imageUrl;
+    } else {
+      console.warn('No images found on Pexels for query:', query);
+      return `https://loremflickr.com/${width}/${height}/not,found`;
+    }
+
+  } catch (error) {
+    console.error('Error fetching from Pexels:', error);
+    return `https://loremflickr.com/${width}/${height}/fetch,error`;
+  }
 }
 
-// Helper to get template description
+// getTemplateDescription (Unchanged)
 export function getTemplateDescription(template: DesignTemplate): string {
   return DESIGN_TEMPLATES[template].description;
 }

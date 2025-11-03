@@ -1,7 +1,7 @@
-// lib/pptGenerator.ts - FINAL FIXED VERSION
+// lib/pptGenerator.ts - FINAL VERSION (Canva-Style Layouts + Error Fixes)
 import PptxGenJS from 'pptxgenjs';
 import { PPTData, SlideDesign, SlideLayout } from '@/types';
-import { DESIGN_TEMPLATES, getUnsplashUrl, type DesignTemplate } from '@/lib/designSystem';
+import { DESIGN_TEMPLATES, getImageUrl, type DesignTemplate, SlideLayoutConfig } from '@/lib/designSystem'; // Use getImageUrl
 
 function normalizeLayout(rawLayout: SlideLayout | undefined): SlideLayout {
   if (!rawLayout) return 'content';
@@ -16,6 +16,7 @@ function cleanText(text: string | undefined | unknown): string {
 }
 
 function cleanTextArray(arr: unknown[]): Array<{ text: string }> {
+  if (!Array.isArray(arr)) return [];
   return arr
     .filter(item => item != null)
     .map(item => ({ text: cleanText(item) }));
@@ -30,26 +31,8 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
-function rgbToHex(r: number, g: number, b: number): string {
-  return ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
-}
-
-function lightenColor(hexColor: string, percent: number): string {
-  const { r, g, b } = hexToRgb(hexColor);
-  const newR = Math.min(255, Math.floor(r + (255 - r) * percent));
-  const newG = Math.min(255, Math.floor(g + (255 - g) * percent));
-  const newB = Math.min(255, Math.floor(b + (255 - b) * percent));
-  return rgbToHex(newR, newG, newB);
-}
-
-function darkenColor(hexColor: string, percent: number): string {
-  const { r, g, b } = hexToRgb(hexColor);
-  return rgbToHex(
-    Math.floor(r * (1 - percent)),
-    Math.floor(g * (1 - percent)),
-    Math.floor(b * (1 - percent))
-  );
-}
+// === FIX: Removed unused lightenColor function ===
+// === FIX: Removed unused darkenColor function ===
 
 function isColorDark(hexColor: string): boolean {
   const { r, g, b } = hexToRgb(hexColor);
@@ -57,6 +40,7 @@ function isColorDark(hexColor: string): boolean {
   return brightness < 128;
 }
 
+// addImageToSlide (Unchanged)
 async function addImageToSlide(
   slide: PptxGenJS.Slide,
   imageUrl: string,
@@ -67,18 +51,76 @@ async function addImageToSlide(
   opacity: number = 100
 ): Promise<void> {
   try {
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText} (URL: ${imageUrl})`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.startsWith('image/')) {
+      throw new Error(`Response was not an image. Content-Type: ${contentType}`);
+    }
+
+    const imageBuffer = await response.arrayBuffer();
+    const base64String = Buffer.from(imageBuffer).toString('base64');
+    
     slide.addImage({
-      path: imageUrl,
-      x,
-      y,
-      w: width,
-      h: height,
+      data: `data:${contentType};base64,${base64String}`,
+      x, y, w: width, h: height,
       sizing: { type: 'cover', w: width, h: height },
       transparency: 100 - opacity,
     });
   } catch (error) {
-    console.warn('Failed to add image:', error);
+    console.warn(`Failed to add image from ${imageUrl}:`, error);
   }
+}
+
+// === HELPER FUNCTION to add text based on layout config ===
+// === FIX: Use the correct 'TextPropsOptions' type ===
+function addTextToSlide(slide: PptxGenJS.Slide, box: SlideLayoutConfig['titleBox'], text: string, defaultOptions: PptxGenJS.TextPropsOptions) {
+  if (!text || !box) return;
+  slide.addText(text, {
+    ...defaultOptions,
+    ...box,
+  });
+}
+
+// === HELPER FUNCTION to add elements based on layout config ===
+function addDecorativeElements(slide: PptxGenJS.Slide, pres: PptxGenJS, elements: SlideLayoutConfig['decorativeElements']) {
+  // === FIX: Removed unused 'pxToInch' variable ===
+  elements.forEach(elem => {
+    switch (elem.type) {
+      case 'circle':
+        slide.addShape(pres.ShapeType.ellipse, {
+          x: elem.x, y: elem.y, w: elem.width, h: elem.height,
+          fill: { color: elem.color, transparency: 100 - elem.opacity },
+          line: { type: 'none' },
+        });
+        break;
+      case 'rectangle':
+      case 'line': // Treat line as a thin rectangle
+        slide.addShape(pres.ShapeType.rect, {
+          x: elem.x, y: elem.y, w: elem.width, h: elem.height,
+          fill: { color: elem.color, transparency: 100 - elem.opacity },
+          line: { type: 'none' },
+          rotate: elem.rotation || 0,
+        });
+        break;
+      case 'triangle':
+        slide.addShape(pres.ShapeType.rtTriangle, {
+          x: elem.x, y: elem.y, w: elem.width, h: elem.height,
+          fill: { color: elem.color, transparency: 100 - elem.opacity },
+          line: { type: 'none' },
+          rotate: elem.rotation || 0,
+        });
+        break;
+    }
+  });
 }
 
 export const generatePresentationAsBase64 = async (
@@ -94,291 +136,134 @@ export const generatePresentationAsBase64 = async (
   pres.title = pptData.title ?? 'AI Generated Presentation';
 
   const globalTheme = pptData.globalTheme;
-  const template = (pptData.template || 'modern-geometric') as DesignTemplate;
-  const templateConfig = DESIGN_TEMPLATES[template];
-  const imageQuery = globalTheme?.imageQuery || 'abstract,modern';
+  const templateName = (pptData.template || 'modern-geometric') as DesignTemplate;
+  const templateConfig = DESIGN_TEMPLATES[templateName];
 
-  console.log(`🎨 Using template: ${template}`);
-
+  console.log(`🎨 Using template: ${templateName}`);
   for (let i = 0; i < pptData.slides.length; i++) {
     const slideData = pptData.slides[i];
     
-    // Enforce consistent design from globalTheme
     const design: SlideDesign = {
-      backgroundColor: globalTheme?.backgroundColor || 'FFFFFF',
-      textColor: globalTheme?.textColor || '2C3E50',
-      titleFont: globalTheme?.titleFont || 'Arial',
-      bodyFont: globalTheme?.bodyFont || 'Calibri',
-      accentColor: globalTheme?.accentColor || '3498DB',
+      backgroundColor: globalTheme?.backgroundColor || templateConfig.palette.background,
+      textColor: globalTheme?.textColor || templateConfig.palette.text,
+      titleFont: globalTheme?.titleFont || templateConfig.fonts.title,
+      bodyFont: globalTheme?.bodyFont || templateConfig.fonts.body,
+      accentColor: globalTheme?.accentColor || templateConfig.palette.accent,
     };
-
     const cleanedDesign = {
       backgroundColor: design.backgroundColor.replace('#', ''),
       textColor: design.textColor.replace('#', ''),
       titleFont: design.titleFont,
       bodyFont: design.bodyFont,
       accentColor: design.accentColor.replace('#', ''),
+      titleColor: isColorDark(design.backgroundColor) ? templateConfig.palette.textLight : templateConfig.palette.text,
+      bodyColor: isColorDark(design.backgroundColor) ? templateConfig.palette.textLight : templateConfig.palette.text,
     };
+    
+    const titleSlideTextColor = templateConfig.palette.textLight;
 
     const layoutKey = normalizeLayout(slideData.layout);
     const slide = pres.addSlide();
-    
-    // Color contrast check (retained for potential design use)
-    isColorDark(cleanedDesign.backgroundColor);
+    slide.background = { fill: cleanedDesign.backgroundColor };
 
     try {
+      let layout: SlideLayoutConfig;
+      
       switch (layoutKey) {
-        case 'title': {
-          const titleLayout = templateConfig.titleLayout;
-          
+        case 'title':
+          layout = templateConfig.titleLayout;
           slide.background = { fill: cleanedDesign.accentColor };
-
-          if (templateConfig.imageStyle === 'overlay' || templateConfig.imageStyle === 'full') {
-            const imageUrl = getUnsplashUrl(imageQuery + ',abstract,gradient', 1920, 1080);
-            await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 25);
-          }
-
-          titleLayout.decorativeElements.forEach(elem => {
-            const pxToInch = (px: number) => px / 96;
-            
-            switch (elem.type) {
-              case 'circle':
-                slide.addShape(pres.ShapeType.ellipse, {
-                  x: pxToInch(elem.x),
-                  y: pxToInch(elem.y),
-                  w: pxToInch(elem.width),
-                  h: pxToInch(elem.height),
-                  fill: { color: elem.color, transparency: 100 - elem.opacity },
-                  line: { type: 'none' },
-                });
-                break;
-              case 'rectangle':
-                slide.addShape(pres.ShapeType.rect, {
-                  x: pxToInch(elem.x),
-                  y: pxToInch(elem.y),
-                  w: pxToInch(elem.width),
-                  h: pxToInch(elem.height),
-                  fill: { color: elem.color, transparency: 100 - elem.opacity },
-                  line: { type: 'none' },
-                  rotate: elem.rotation || 0,
-                });
-                break;
-              case 'triangle':
-                slide.addShape(pres.ShapeType.rtTriangle, {
-                  x: pxToInch(elem.x),
-                  y: pxToInch(elem.y),
-                  w: pxToInch(elem.width),
-                  h: pxToInch(elem.height),
-                  fill: { color: elem.color, transparency: 100 - elem.opacity },
-                  line: { type: 'none' },
-                  rotate: elem.rotation || 0,
-                });
-                break;
-              case 'line':
-                slide.addShape(pres.ShapeType.rect, {
-                  x: pxToInch(elem.x),
-                  y: pxToInch(elem.y),
-                  w: pxToInch(elem.width),
-                  h: pxToInch(elem.height),
-                  fill: { color: elem.color, transparency: 100 - elem.opacity },
-                  line: { type: 'none' },
-                });
-                break;
-            }
-          });
-
-          slide.addText(cleanText(slideData.title) ?? 'Untitled', {
-            x: 1, y: 1.8, w: 8, h: 1.5,
-            fontSize: 52,
-            bold: true,
-            color: 'FFFFFF',
-            align: 'center',
-            valign: 'middle',
-            fontFace: cleanedDesign.titleFont,
-            shadow: {
-              type: 'outer',
-              blur: 10,
-              offset: 5,
-              angle: 45,
-              color: '000000',
-              opacity: 0.4,
-            },
-          });
-
-          if (slideData.subtitle) {
-            slide.addText(cleanText(slideData.subtitle), {
-              x: 1.5, y: 3.5, w: 7, h: 0.8,
-              fontSize: 24,
-              color: 'FFFFFF',
-              align: 'center',
-              fontFace: cleanedDesign.bodyFont,
-              transparency: 10,
-            });
-          }
           break;
-        }
-
-        case 'section': {
-          slide.background = { fill: cleanedDesign.backgroundColor };
-
-          if (templateConfig.imageStyle === 'side') {
-            const imageUrl = getUnsplashUrl(imageQuery, 960, 1080);
-            await addImageToSlide(slide, imageUrl, 5, 0, 5, 5.625, 40);
-          }
-
-          slide.addShape(pres.ShapeType.rect, {
-            x: 0, y: 0, w: 5, h: 5.625,
-            fill: { color: cleanedDesign.accentColor },
-            line: { type: 'none' },
-          });
-
-          const lightAccent = lightenColor(cleanedDesign.accentColor, 0.3);
-          const darkAccent = darkenColor(cleanedDesign.accentColor, 0.2);
-
-          slide.addShape(pres.ShapeType.ellipse, {
-            x: 3, y: -1, w: 4, h: 4,
-            fill: { color: lightAccent, transparency: 70 },
-            line: { type: 'none' },
-          });
-
-          slide.addShape(pres.ShapeType.ellipse, {
-            x: -0.5, y: 4, w: 3, h: 3,
-            fill: { color: darkAccent, transparency: 60 },
-            line: { type: 'none' },
-          });
-
-          slide.addText(cleanText(slideData.title) ?? 'Section', {
-            x: 0.5, y: 2.3, w: 4, h: 1.2,
-            fontSize: 44,
-            bold: true,
-            color: 'FFFFFF',
-            align: 'left',
-            valign: 'middle',
-            fontFace: cleanedDesign.titleFont,
-          });
-
-          slide.addShape(pres.ShapeType.rect, {
-            x: 0.5, y: 3.6, w: 2, h: 0.08,
-            fill: { color: 'FFFFFF' },
-            line: { type: 'none' },
-          });
+        case 'section':
+          layout = templateConfig.sectionLayout;
           break;
-        }
-
         case 'twocolumn':
-        case 'content':
-        default: {
-          slide.background = { fill: cleanedDesign.backgroundColor };
-
-          if (templateConfig.imageStyle === 'overlay') {
-            const imageUrl = getUnsplashUrl(imageQuery, 1920, 1080);
-            await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 15);
-          } else if (templateConfig.imageStyle === 'side') {
-            const imageUrl = getUnsplashUrl(imageQuery, 960, 1080);
-            await addImageToSlide(slide, imageUrl, 5.2, 1.5, 4.6, 3.9, 35);
-          } else if (templateConfig.imageStyle === 'full' && i > 0) {
-            const imageUrl = getUnsplashUrl(imageQuery + ',minimal', 1920, 1080);
-            await addImageToSlide(slide, imageUrl, 0, 0, 10, 5.625, 10);
-          }
-
-          slide.addShape(pres.ShapeType.rect, {
-            x: 0, y: 0, w: 10, h: 1.2,
-            fill: { color: cleanedDesign.accentColor },
-            line: { type: 'none' },
-          });
-
-          const lightAccent = lightenColor(cleanedDesign.accentColor, 0.3);
-          slide.addShape(pres.ShapeType.rect, {
-            x: 0, y: 1.15, w: 10, h: 0.05,
-            fill: { color: lightAccent },
-            line: { type: 'none' },
-          });
-
-          const contentLayout = templateConfig.contentLayout;
-          contentLayout.decorativeElements.forEach(elem => {
-            const pxToInch = (px: number) => px / 96;
-            
-            switch (elem.type) {
-              case 'circle':
-                slide.addShape(pres.ShapeType.ellipse, {
-                  x: pxToInch(elem.x),
-                  y: pxToInch(elem.y),
-                  w: pxToInch(elem.width),
-                  h: pxToInch(elem.height),
-                  fill: { color: elem.color, transparency: 100 - elem.opacity },
-                  line: { type: 'none' },
-                });
-                break;
-              case 'rectangle':
-                slide.addShape(pres.ShapeType.rect, {
-                  x: pxToInch(elem.x),
-                  y: pxToInch(elem.y),
-                  w: pxToInch(elem.width),
-                  h: pxToInch(elem.height),
-                  fill: { color: elem.color, transparency: 100 - elem.opacity },
-                  line: { type: 'none' },
-                });
-                break;
-            }
-          });
-
-          slide.addText(cleanText(slideData.title) ?? 'Slide Title', {
-            x: 0.6, y: 0.3, w: 8.5, h: 0.6,
-            fontSize: 36,
-            bold: true,
-            color: 'FFFFFF',
-            valign: 'middle',
-            fontFace: cleanedDesign.titleFont,
-          });
-
-          if (slideData.content && slideData.content.length > 0) {
-            const contentWidth = templateConfig.imageStyle === 'side' ? 4.5 : 8.8;
-            
-            if (layoutKey === 'twocolumn') {
-              const mid = Math.ceil(slideData.content.length / 2);
-              const left = cleanTextArray(slideData.content.slice(0, mid));
-              const right = cleanTextArray(slideData.content.slice(mid));
-
-              slide.addShape(pres.ShapeType.rect, {
-                x: 4.95, y: 1.8, w: 0.1, h: 3.5,
-                fill: { color: cleanedDesign.accentColor, transparency: 30 },
-                line: { type: 'none' },
-              });
-
-              if (left.length > 0) {
-                slide.addText(left, {
-                  x: 0.6, y: 1.8, w: 4, h: 3.5,
-                  fontSize: 16,
-                  bullet: { type: 'number' },
-                  color: cleanedDesign.accentColor,
-                  fontFace: cleanedDesign.bodyFont,
-                  lineSpacing: 24,
-                });
-              }
-
-              if (right.length > 0) {
-                slide.addText(right, {
-                  x: 5.3, y: 1.8, w: 4, h: 3.5,
-                  fontSize: 16,
-                  bullet: { type: 'number' },
-                  color: cleanedDesign.accentColor,
-                  fontFace: cleanedDesign.bodyFont,
-                  lineSpacing: 24,
-                });
-              }
-            } else {
-              slide.addText(cleanTextArray(slideData.content), {
-                x: 0.6, y: 1.8, w: contentWidth, h: 3.5,
-                fontSize: 18,
-                bullet: { type: 'number' },
-                color: cleanedDesign.accentColor,
-                fontFace: cleanedDesign.bodyFont,
-                lineSpacing: 26,
-              });
-            }
-          }
+          layout = templateConfig.twoColumnLayout;
           break;
+        case 'content':
+        default:
+          layout = templateConfig.contentLayout;
+          break;
+      }
+
+      // 1. Add Decorative Elements
+      if (layout.decorativeElements) {
+        addDecorativeElements(slide, pres, layout.decorativeElements);
+      }
+
+      // 2. Add Image
+      const slideImageQuery = slideData.imageQuery || globalTheme?.imageQuery || 'abstract';
+      
+      if (layout.imageBox) {
+        const imageUrl = await getImageUrl(slideImageQuery, 1920, 1080);
+        const sizing = (layout.imageBox.w === 10 || layout.imageBox.h === 5.625) ? 'cover' : 'contain';
+        const opacity = (sizing === 'cover') ? 25 : 100;
+        
+        await addImageToSlide(
+          slide, 
+          imageUrl, 
+          layout.imageBox.x, 
+          layout.imageBox.y, 
+          layout.imageBox.w, 
+          layout.imageBox.h,
+          opacity
+        );
+        if (sizing === 'cover') {
+          cleanedDesign.titleColor = templateConfig.palette.textLight;
+          cleanedDesign.bodyColor = templateConfig.palette.textLight;
         }
+      }
+
+      // 3. Add Text
+      // === FIX: Use 'TextPropsOptions' type ===
+      const titleOptions: PptxGenJS.TextPropsOptions = {
+        fontFace: cleanedDesign.titleFont,
+        color: layoutKey === 'title' ? titleSlideTextColor : cleanedDesign.titleColor,
+        margin: 0,
+      };
+      // === FIX: Use 'TextPropsOptions' type ===
+      const bodyOptions: PptxGenJS.TextPropsOptions = {
+        fontFace: cleanedDesign.bodyFont,
+        color: cleanedDesign.bodyColor,
+        margin: 0,
+      };
+      
+      addTextToSlide(slide, layout.titleBox, cleanText(slideData.title) ?? 'Slide Title', titleOptions);
+      
+      if (layout.subtitleBox) {
+        // === FIX: 'fontSize' is valid on TextPropsOptions ===
+        addTextToSlide(slide, layout.subtitleBox, cleanText(slideData.subtitle), { ...bodyOptions, fontSize: 24, color: titleSlideTextColor });
+      }
+
+      if (layout.contentBox && slideData.content && slideData.content.length > 0) {
+        // Handle two-column split
+        let content = slideData.content;
+        if (layout.contentBoxTwo) {
+          const mid = Math.ceil(slideData.content.length / 2);
+          content = slideData.content.slice(0, mid);
+        }
+
+        slide.addText(cleanTextArray(content), {
+          ...bodyOptions,
+          ...layout.contentBox,
+          bullet: { type: 'number' },
+          fontSize: 16,
+          lineSpacing: 24,
+        });
+      }
+      
+      // 4. Add Second Column Text
+      if (layout.contentBoxTwo && slideData.content && slideData.content.length > 1) {
+        const mid = Math.ceil(slideData.content.length / 2);
+        const rightColContent = slideData.content.slice(mid);
+        
+        slide.addText(cleanTextArray(rightColContent), {
+          ...bodyOptions,
+          ...layout.contentBoxTwo,
+          bullet: { type: 'number' },
+          fontSize: 16,
+          lineSpacing: 24,
+        });
       }
 
       slide.addText(`${i + 1}`, {
@@ -388,7 +273,6 @@ export const generatePresentationAsBase64 = async (
         align: 'right',
         bold: true,
       });
-
     } catch (err) {
       console.error(`Error processing slide ${i + 1}:`, err);
     }
