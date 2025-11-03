@@ -58,6 +58,11 @@ Body Font: ${templateDesign.fonts.body}
 Global Image Keywords: "${globalImageQuery}"
 
 📊 REQUIRED THINKING PROCESS (Phase 1-5):
+Output your thinking phases FIRST as plain text lines, each starting with "THOUGHT: ".
+Output ALL 5 phases, one per line.
+Do NOT output any JSON until after the thinking phases.
+After the last THOUGHT: line, output exactly "<<<JSON_START>>>" followed by the JSON.
+
 PHASE 1 - RESEARCH INITIATION:
 "Begin Researching [Topic]: Ive initiated the research phase for the [topic] presentation.
 Im starting with broad web searches using carefully selected keywords related to [topic’s key aspects].
@@ -70,8 +75,8 @@ The objective is to ensure every slide reflects a logical flow — introducing t
 PHASE 3 - RESEARCH & ANALYSIS:
 "Unveiling [Topics Key Aspect]: Ive begun researching '[topic]' to gather detailed insights.
 Initial searches into '[specific query]' have yielded valuable findings, helping me understand [key discoveries].
-Now, I’m focusing on deeper details like [specific aspects]. This phase aims to uncover factual information that strengthens the presentation narrative."
-type:action tool:webSearch - Searching for: '[specific search query]'
+Now, I’m focusing on deeper details like [specific aspects]. This phase aims to uncover factual information that strengthens the presentation narrative.
+type:action tool:webSearch - Searching for: '[specific search query]'"
 PHASE 4 - CONTENT EXTRACTION:
 "Ive gathered preliminary knowledge about [topic] and will now examine relevant websites to extract finer details for the slides.
 type:action tool:readWebsite - Reading website: [https://example.com] for [specific purpose]
@@ -146,9 +151,15 @@ const getEditPrompt = (currentPPT: PPTData): string => {
 6.  **HANDLE 'ADD IMAGES':** If a slide is missing an \`imageQuery\` and the user asks to "add images", you must *only* add a new, relevant \`imageQuery\` field to that slide.
 7.  **NEVER OMIT \`imageQuery\`:** If a slide already has an \`imageQuery\`, you must return it.
 
+Output your thinking as a single plain text line starting with "THOUGHT: ".
+Do NOT output any JSON until after the thinking line.
+After the THOUGHT: line, output exactly "<<<JSON_START>>>" followed by the JSON.
+
 Return **ONLY** the full \`presentation\` JSON object, with the \`thinking\` array showing a single step of what you did.
 
 EXAMPLE RESPONSE:
+THOUGHT: User asked to change the title of slide 1. I have updated the 'title' field for that slide and am returning the full JSON.
+<<<JSON_START>>>
 {
   "thinking": ["User asked to change the title of slide 1. I have updated the 'title' field for that slide and am returning the full JSON."],
   "presentation": { ... (the entire, updated PPTData object) ... }
@@ -210,39 +221,74 @@ export async function POST(request: Request) {
 
         try {
           for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (text) 
-            {
-              fullResponseText += text;
-              if (!thinkingStepsSent) {
-                try {
-                  const partial = JSON.parse(fullResponseText);
-                  if (partial.thinking && Array.isArray(partial.thinking)) {
-        
-                    for (const thought of partial.thinking) {
-                      let stepType: 'thought' | 'action' = 'thought';
-                      let tool: 'webSearch' | 'readWebsite' | undefined;
-                      const thoughtLower = thought.toLowerCase();
-  
-                      if (thoughtLower.includes('type:action') && thoughtLower.includes('tool:websearch')) {
-                        stepType = 'action';
-                        tool = 'webSearch';
-                      } else if (thoughtLower.includes('type:action') && thoughtLower.includes('tool:readwebsite')) {
-                        stepType = 'action';
-                        tool = 'readWebsite';
-                      }
-                      const thinkingMsg = `<thought type="${stepType}"${tool ?
- ` tool="${tool}"` : ''}>${thought}</thought>\n`;
-                      controller.enqueue(encoder.encode(thinkingMsg));
+            const text = chunk.text() || '';
+            fullResponseText += text;
+
+            if (!thinkingStepsSent) {
+              // Split accumulated text into lines
+              const lines = fullResponseText.split('\n');
+              for (const line of lines) {
+                if (line.trim().startsWith('THOUGHT:')) {
+                  const thoughtContent = line.replace(/^THOUGHT:\s*/, '').trim();
+                  if (thoughtContent) {
+                    let stepType: 'thought' | 'action' = 'thought';
+                    let tool: 'webSearch' | 'readWebsite' | undefined;
+                    const thoughtLower = thoughtContent.toLowerCase();
+
+                    if (thoughtLower.includes('type:action') && thoughtLower.includes('tool:websearch')) {
+                      stepType = 'action';
+                      tool = 'webSearch';
+                    } else if (thoughtLower.includes('type:action') && thoughtLower.includes('tool:readwebsite')) {
+                      stepType = 'action';
+                      tool = 'readWebsite';
                     }
-                    thinkingStepsSent = true;
+
+                    const thinkingMsg = `<thought type="${stepType}"${tool ? ` tool="${tool}"` : ''}>${thoughtContent}</thought>\n`;
+                    controller.enqueue(encoder.encode(thinkingMsg));
                   }
-                } catch {}
+                }
+              }
+
+              // If we see the separator, mark as sent to avoid further processing
+              if (fullResponseText.includes('<<<JSON_START>>>')) {
+                thinkingStepsSent = true;
               }
             }
           }
 
-          const responseData = JSON.parse(fullResponseText);
+          // Fallback: If no THOUGHT: lines were found, try old JSON parse method
+          if (!thinkingStepsSent) {
+            try {
+              const partial = JSON.parse(fullResponseText);
+              if (partial.thinking && Array.isArray(partial.thinking)) {
+                for (const thought of partial.thinking) {
+                  let stepType: 'thought' | 'action' = 'thought';
+                  let tool: 'webSearch' | 'readWebsite' | undefined;
+                  const thoughtLower = thought.toLowerCase();
+
+                  if (thoughtLower.includes('type:action') && thoughtLower.includes('tool:websearch')) {
+                    stepType = 'action';
+                    tool = 'webSearch';
+                  } else if (thoughtLower.includes('type:action') && thoughtLower.includes('tool:readwebsite')) {
+                    stepType = 'action';
+                    tool = 'readWebsite';
+                  }
+                  const thinkingMsg = `<thought type="${stepType}"${tool ? ` tool="${tool}"` : ''}>${thought}</thought>\n`;
+                  controller.enqueue(encoder.encode(thinkingMsg));
+                }
+                thinkingStepsSent = true;
+              }
+            } catch {}
+          }
+
+          // Extract JSON part
+          let jsonText = fullResponseText;
+          const separatorIndex = fullResponseText.indexOf('<<<JSON_START>>>');
+          if (separatorIndex !== -1) {
+            jsonText = fullResponseText.substring(separatorIndex + '<<<JSON_START>>>'.length).trim();
+          }
+
+          const responseData = JSON.parse(jsonText);
           if (!responseData.presentation) throw new Error('Invalid response - missing presentation object');
           
           const presentation: GeminiResponse = responseData.presentation;
@@ -296,8 +342,7 @@ export async function POST(request: Request) {
         } catch (error) {
           const errorMsg = {
             type: "error",
-            error: error instanceof Error ?
- error.message : "Processing failed"
+            error: error instanceof Error ? error.message : "Processing failed"
           };
           console.error("--- Stream Error ---", error, fullResponseText);
           controller.enqueue(encoder.encode(`\n<<<JSON_START>>>\n${JSON.stringify(errorMsg)}`));

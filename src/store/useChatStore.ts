@@ -58,9 +58,15 @@ export const useChatStore = create<ChatStore>()(
             return state;
           }
 
+          // Deduplicate by ID or by content (for thinking steps)
+          const exists = state.messages.some(m =>
+            m.id === message.id ||
+            (m.thinkingStep && message.thinkingStep && m.content === message.content)
+          );
+          if (exists) return state;
+
           const newMessages = [...state.messages, message];
 
-          // Auto-title only on first user message
           let title = state.sessions.find((s) => s.id === sessionId)?.title;
           if (!title && message.role === 'user' && state.messages.length === 0) {
             title = message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '');
@@ -111,7 +117,6 @@ export const useChatStore = create<ChatStore>()(
         });
       },
 
-      /** Returns the new session id */
       createNewSession: () => {
         const newSession: ChatSession = {
           id: uuidv4(),
@@ -122,7 +127,6 @@ export const useChatStore = create<ChatStore>()(
           updatedAt: new Date(),
         };
 
-        // Use functional set to update sessions from previous state
         set((state) => ({
           currentSessionId: newSession.id,
           messages: [],

@@ -1,49 +1,32 @@
 // hooks/useGeneration.ts
+'use client';
+
 import { useChatStore } from '@/store/useChatStore';
 import { toast } from 'sonner';
-import { ChatMessage, ThinkingStep } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
+import type { ChatMessage, ThinkingStep } from '@/types';
 
-const STREAM_SEPARATOR = "\n<<<JSON_START>>>\n";
+const STREAM_SEPARATOR = '<<<JSON_START>>>';
 
-/**
- * Extract thinking steps with enhanced parsing
- */
 function extractThoughtSteps(text: string): ThinkingStep[] {
   const steps: ThinkingStep[] = [];
-  
-  // Enhanced regex to capture type and tool attributes
-  const thoughtRegex = /<thought(?:\s+type="(thought|action)")?(?:\s+tool="(webSearch|readWebsite)")?>[\s\S]*?<\/thought>/g;
+  const thoughtRegex = /<thought\s+type="([^"]+)"(?:\s+tool="([^"]+)")?\s*>([\s\S]*?)<\/thought>/g;
   let match;
-  
+
   while ((match = thoughtRegex.exec(text)) !== null) {
-    const fullMatch = match[0];
-    const type = match[1] as 'thought' | 'action' || 'thought';
-    const tool = match[2] as 'webSearch' | 'readWebsite' | undefined;
-    
-    // Extract content between tags
-    const contentMatch = fullMatch.match(/<thought[^>]*>([\s\S]*?)<\/thought>/);
-    const content = contentMatch ? contentMatch[1].trim() : '';
-    
-    if (content) {
-      steps.push({
-        type,
-        tool,
-        content,
-      });
-    }
+    steps.push({
+      type: match[1] as 'thought' | 'action',
+      tool: match[2] as 'webSearch' | 'readWebsite' | undefined,
+      content: match[3].trim(),
+      isStreaming: false,
+    });
   }
 
-  // Check for incomplete thought (currently streaming)
+  // Handle incomplete last thought
   const lastThoughtStart = text.lastIndexOf('<thought');
-  const lastThoughtEnd = text.lastIndexOf('</thought>');
-  
-  if (lastThoughtStart > lastThoughtEnd && lastThoughtStart !== -1) {
-    const streamingMatch = text.substring(lastThoughtStart).match(/<thought[^>]*>([\s\S]*)/);
-    const streamingContent = streamingMatch ? streamingMatch[1].trim() : '';
-    
-    if (streamingContent && streamingContent.length > 0) {
-      // Try to detect type from tag attributes
+  if (lastThoughtStart !== -1 && text.lastIndexOf('</thought>') < lastThoughtStart) {
+    const streamingContent = text.substring(lastThoughtStart).replace(/<thought[^>]*>/, '').trim();
+    if (streamingContent) {
       const typeMatch = text.substring(lastThoughtStart).match(/type="(thought|action)"/);
       const toolMatch = text.substring(lastThoughtStart).match(/tool="(webSearch|readWebsite)"/);
       
@@ -61,7 +44,7 @@ function extractThoughtSteps(text: string): ThinkingStep[] {
 
 function convertStepsToMessages(steps: ThinkingStep[]): ChatMessage[] {
   return steps
-    .filter(step => !step.isStreaming && step.content.length > 0)
+    .filter(step => step.content.length > 0)
     .map(step => ({
       id: uuidv4(),
       role: 'model' as const,
@@ -78,7 +61,6 @@ export function useGeneration() {
     const trimmedInput = input.trim();
     if (!trimmedInput) return;
 
-    // Add user message
     const userMessage: ChatMessage = {
       id: uuidv4(),
       role: 'user',
@@ -87,11 +69,10 @@ export function useGeneration() {
     };
     addMessage(userMessage);
 
-    // Set loading state
     useChatStore.setState({ isLoading: true });
 
     let accumulatedText = "";
-    let finalThinkingSteps: ThinkingStep[] = [];
+    const finalThinkingSteps: ThinkingStep[] = [];  // now const + push
     let jsonStarted = false;
 
     try {
@@ -111,7 +92,7 @@ export function useGeneration() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      console.log('📄 Starting stream...');
+      console.log('Starting stream...');
 
       while (true) {
         const { done, value } = await reader.read();
@@ -120,64 +101,47 @@ export function useGeneration() {
         const chunk = decoder.decode(value, { stream: true });
         accumulatedText += chunk;
 
-        // Check if JSON part has started
+        const currentSteps = extractThoughtSteps(accumulatedText);
+        const completeSteps = currentSteps.filter(s => !s.isStreaming);
+
+        const existingContents = finalThinkingSteps.map(s => s.content);
+        const newSteps = completeSteps.filter(s => !existingContents.includes(s.content));
+
+        if (newSteps.length > 0) {
+          const messages = convertStepsToMessages(newSteps);
+          messages.forEach(addMessage);
+          finalThinkingSteps.push(...newSteps);  // mutate array
+        }
+
         if (accumulatedText.includes(STREAM_SEPARATOR) && !jsonStarted) {
           jsonStarted = true;
-          console.log('📍 JSON separator found');
-          
-          // Extract thinking part (before separator)
-          const thinkingPart = accumulatedText.split(STREAM_SEPARATOR)[0];
-          finalThinkingSteps = extractThoughtSteps(thinkingPart);
+          console.log('JSON separator found');
         }
       }
 
-      console.log('✅ Stream complete');
+      console.log('Stream complete');
 
-      // If no separator found, check if we have thinking tags anyway
-      if (!jsonStarted && accumulatedText.includes('<thought')) {
-        console.log('⚠️ Found thinking tags but no separator, extracting anyway...');
-        const lastThoughtEnd = accumulatedText.lastIndexOf('</thought>');
-        if (lastThoughtEnd !== -1) {
-          const thinkingPart = accumulatedText.substring(0, lastThoughtEnd + 10);
-          finalThinkingSteps = extractThoughtSteps(thinkingPart);
-        }
-      }
-
-      // Convert thinking steps to permanent messages
-      if (finalThinkingSteps.length > 0) {
-        const thinkingMessages = convertStepsToMessages(finalThinkingSteps);
-        thinkingMessages.forEach(msg => addMessage(msg));
-      }
-
-      // Extract and parse JSON
       let jsonText = "";
-      
       if (accumulatedText.includes(STREAM_SEPARATOR)) {
         const parts = accumulatedText.split(STREAM_SEPARATOR);
-        jsonText = parts[parts.length - 1]?.trim();
+        jsonText = parts[parts.length - 1]?.trim() || '';
       } else {
-        // Try to find JSON without separator
         const jsonMatch = accumulatedText.match(/\{[\s\S]*"type"\s*:\s*"done"[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonText = jsonMatch[0];
-        }
+        if (jsonMatch) jsonText = jsonMatch[0];
       }
 
-      if (!jsonText) {
-        throw new Error("No JSON data found in response");
-      }
+      if (!jsonText) throw new Error("No JSON data found");
 
-      console.log('📦 Parsing JSON, length:', jsonText.length);
       const doneData = JSON.parse(jsonText);
       
       if (doneData.type === 'done' && doneData.data) {
         const slideCount = doneData.data.slides?.length || 0;
-        console.log('✅ Generated', slideCount, 'slides');
+        console.log('Generated', slideCount, 'slides');
         
         const finalMessage: ChatMessage = {
           id: uuidv4(),
           role: 'model',
-          content: `✓ Successfully generated ${slideCount} slide${slideCount !== 1 ? 's' : ''} with rich content`,
+          content: `Successfully generated ${slideCount} slide${slideCount !== 1 ? 's' : ''} with rich content`,
           timestamp: new Date(),
         };
         addMessage(finalMessage);
@@ -195,10 +159,8 @@ export function useGeneration() {
 
     } catch (err) {
       const message = err instanceof Error ? err.message : "An unknown error occurred";
-      console.error("❌ Error:", message);
-      toast.error('Generation failed', {
-        description: message,
-      });
+      console.error("Error:", message);
+      toast.error('Generation failed', { description: message });
       
       const errorMessage: ChatMessage = {
         id: uuidv4(),
