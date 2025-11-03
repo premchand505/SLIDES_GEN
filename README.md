@@ -15,8 +15,6 @@ A modern, full-stack Next.js application that generates and edits PowerPoint pre
 - **Interactive Chat Interface** - Natural conversation flow with the AI
 - **Real-Time Thinking Display** - Watch the AI's 5-phase planning process
 - **Dynamic Editing** - Modify presentations through follow-up messages
-- **Professional Design System** - 5 templates with 20 unique layouts
-- **High-Quality Images** - Automatic integration of relevant Pexels photos
 - **PPTX Export** - Download fully-editable PowerPoint files
 
 ### 🚀 Advanced Features
@@ -24,7 +22,6 @@ A modern, full-stack Next.js application that generates and edits PowerPoint pre
 - **Persistent Chat History** - All sessions saved to localStorage
 - **Mobile Responsive** - Optimized for desktop, tablet, and mobile
 - **User Profiles** - Personalized experience with name/organization
-- **Keyboard Navigation** - Arrow keys, wheel scroll, swipe gestures
 - **Session Management** - Create, load, and delete multiple conversations
 
 ### 🎨 Design Templates
@@ -194,14 +191,6 @@ Stream Format:
 **Implementation:** `hooks/useGeneration.ts` extracts thinking steps with regex, then parses final JSON.
 
 ### 2. Design System
-
-**5 Templates x 4 Layouts = 20 Unique Designs**
-
-Each template defines:
-- Color palette (6 colors)
-- Typography (title/body fonts)
-- Layout configs for title, content, section, twocolumn slides
-- Decorative elements (circles, lines, gradients)
 
 **Example:** Executive Template
 ```typescript
@@ -494,29 +483,6 @@ Check browser console for parsing errors
 Verify extractThoughtSteps regex in useGeneration.ts
 Ensure Gemini prompt includes thinking instructions
 
-Debug Mode
-Enable detailed logging:
-typescript// Add to useGeneration.ts
-const DEBUG = true;
-
-if (DEBUG) {
-  console.log('🔍 Accumulated text:', accumulatedText);
-  console.log('🔍 Extracted steps:', finalThinkingSteps);
-  console.log('🔍 JSON data:', doneData);
-}
-📊 Performance Metrics
-Bundle Size (Production Build)
-
-First Load JS: ~280 KB
-Route chunks: ~120 KB
-Total bundle: ~400 KB (gzipped)
-
-Load Times
-
-Initial page load: ~1.2s
-Time to interactive: ~1.8s
-Lighthouse score: 95+
-
 API Response Times
 
 /api/gemini (streaming): 5-15s (depends on AI)
@@ -660,73 +626,6 @@ export function MyComponent({ ... }: Props) {
 - [ ] Analytics dashboard
 - [ ] API for developers
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-````
-MIT License
-
-Copyright (c) 2024 [Your Name]
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software...
-🙏 Acknowledgments
-Technologies
-
-Google Gemini AI - AI model
-pptxgenjs - PowerPoint generation
-Pexels - Stock images
-Next.js - React framework
-Tailwind CSS - Styling
-shadcn/ui - UI components
-Zustand - State management
-Framer Motion - Animations
-
-Inspiration
-
-MagicSlides AI - UI reference
-Gamma App - Design inspiration
-Beautiful.ai - Template ideas
-
-📞 Support
-Get Help
-
-📧 Email: your.email@example.com
-🐛 Report bugs: GitHub Issues
-💬 Discussions: GitHub Discussions
-🐦 Twitter: @yourhandle
-
-Documentation
-
-Installation Guide
-API Reference
-Design System Guide
-Contributing Guide
-
-🎓 Assignment Compliance
-This project fulfills all requirements from the full-stack developer assignment:
-✅ Required Features
-
- Chat Application UI - Similar to MagicSlides AI-Slide
- AI Integration - Gemini 2.5 Pro Reasoning Model
- PPT Generation - Using pptxgenjs library
- Dynamic Editing - Update slides via prompts
-
-✅ Plus Points (All Implemented)
-
- Streaming - Custom protocol with thinking phase
- Download Option - PPTX export with high-quality output
- Chat History - Session management with localStorage persistence
-
-📦 Deliverables
-
- Detailed README - Comprehensive documentation (this file)
- Deployed Link - Live Demo
- GitHub Repository - Source Code
-
 🎯 Extra Features (Beyond Requirements)
 
 User profile system
@@ -740,6 +639,6 @@ Error handling and user feedback
 
 
 Built with ❤️ for the Full-Stack Developer Assignment
-Demo Video: YouTube Link
-Live App: https://your-app.vercel.app
-Source Code: GitHub Repository
+Demo Video: 
+Live App: https://slides-genai.vercel.app
+Source Code: https://github.com/premchand505/SLIDES_GEN
